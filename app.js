@@ -44,6 +44,7 @@ const DEFAULT_SETTINGS = {
   lastSheetPullAt: null,
   dismissedMergePairs: [],
   simpleModeBottle: true,
+  lastLocalMutationAt: null,
   simpleModeCustomer: true,
 };
 
@@ -110,11 +111,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       box.querySelector('#m-skip').addEventListener('click', () => location.reload());
       box.querySelector('#m-pull').addEventListener('click', async () => {
         closeModal();
-        await pullFromSpreadsheet(true);
+        await pullFromSpreadsheet(false);
         location.reload();
       });
     } else {
-      await pullFromSpreadsheet(true);
+      await pullFromSpreadsheet(false);
       location.reload();
     }
   });
@@ -338,6 +339,12 @@ async function logOperation(actionType, targetType, targetId, before, after, not
   };
   await APP.storage.putOperationLog(log);
   APP.operationLogs.push(log);
+  // このメソッドは実際にこの端末で操作が行われた時にしか呼ばれない（プルで取得した内容は
+  // 直接ストレージに書き込まれるだけで、ここは通らない）。そのため、この端末に
+  // まだ送信していない変更があるかどうかは、operationLogsの中身ではなく、
+  // このタイムスタンプ（自端末での最後の変更時刻）で判定する。
+  APP.settings.lastLocalMutationAt = log.timestamp;
+  await APP.storage.putSettings(APP.settings);
 }
 
 // ---- トースト ----
@@ -2781,9 +2788,11 @@ async function syncToSpreadsheet(silent = false) {
 // このお客様のデータが最後に同期した後に変更されたかどうか
 // （＝プッシュしていないローカル変更が残っているか）を判定する
 function hasUnsyncedLocalChanges() {
+  const lastMutation = APP.settings.lastLocalMutationAt;
+  if (!lastMutation) return false;
   const lastSync = APP.settings.lastSheetPushAt;
-  if (!lastSync) return APP.operationLogs.length > 0;
-  return APP.operationLogs.some((l) => l.timestamp > lastSync);
+  if (!lastSync) return true;
+  return lastMutation > lastSync;
 }
 
 // JSONバックアップの復元や共有データの取得（プル）を行うと、バックアップ／共有データに
@@ -2798,6 +2807,9 @@ async function importAllPreservingSyncSettings(data) {
     lastSheetPullAt: APP.settings.lastSheetPullAt,
     simpleModeBottle: APP.settings.simpleModeBottle,
     simpleModeCustomer: APP.settings.simpleModeCustomer,
+    // プル直後は、この端末の状態は共有データと完全に一致しているはずなので、
+    // 「まだ送信していない変更」は無いものとしてリセットする
+    lastLocalMutationAt: null,
   };
   await APP.storage.importAll(data);
   await refreshCache(false);
