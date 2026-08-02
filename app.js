@@ -144,6 +144,16 @@ function scheduleAutoSync() {
   autoSyncTimer = setTimeout(() => { syncToSpreadsheet(true); }, 4000);
 }
 
+// 来店登録・統合など、ここで確実に送信しておきたい操作の直後に使う。
+// 保留中のデバウンス送信をキャンセルしてから即座に送信する（確認や通知は行わない、静かな送信）。
+async function forceSyncNow() {
+  if (autoSyncTimer) {
+    clearTimeout(autoSyncTimer);
+    autoSyncTimer = null;
+  }
+  return syncToSpreadsheet(true);
+}
+
 function setupNav() {
   document.getElementById('sidenav').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-screen]');
@@ -739,6 +749,7 @@ async function handleAddSubmit(root) {
   }
 
   await refreshCache();
+  await forceSyncNow();
   showToast(`${rows.length}本登録しました（${createdLabels.join('、')}）`);
   renderScreen('add');
 }
@@ -825,6 +836,7 @@ async function applyVisitDateToBottles(customerId, visitDate) {
 async function registerVisit(customerId, visitDate) {
   const count = await applyVisitDateToBottles(customerId, visitDate);
   await refreshCache();
+  await forceSyncNow();
   showToast(`${count}本のボトルの最終来店日を更新しました`);
   renderScreen(APP.currentScreen);
 }
@@ -1362,6 +1374,7 @@ async function mergeCustomerGroup(memberIds, newName, newKana) {
   await refreshCache();
   await syncCustomerLastVisitToLatest(anchor.id);
   await refreshCache();
+  await forceSyncNow();
   showToast(`${members.length}人を「${newName}」様に統合しました`);
   renderScreen('merge');
 }
@@ -1612,6 +1625,7 @@ function renderMergeScreen(root) {
     await refreshCache();
     await syncCustomerLastVisitToLatest(targetCustomer.id);
     await refreshCache();
+    await forceSyncNow();
     showToast(`${sourceBottles.length}本を ${finalName} 様に統合しました`);
     renderScreen('merge');
   });
@@ -1794,6 +1808,7 @@ async function discardBottle(bottleId, remainingAmount, afterScreen = 'disposal-
 
   delete APP.remainingDraft[bottleId];
   await refreshCache();
+  await forceSyncNow();
   showToast(`${bottle.bottleType} No.${before.bottleNo} を破棄しました`);
   renderScreen(afterScreen);
 }
@@ -2330,6 +2345,7 @@ async function saveDetailScreenChanges(root, bottle, customer) {
   }
 
   await refreshCache();
+  await forceSyncNow();
   showToast(visitCount > 0 ? `保存しました（${visitCount}本の最終来店日を更新）` : '保存しました');
   return true;
 }
@@ -2900,6 +2916,7 @@ function confirmOverwriteImport(data) {
     box2.querySelector('#m-confirm2').addEventListener('click', async () => {
       await importAllPreservingSyncSettings(data);
       closeModal();
+      await forceSyncNow();
       showToast('データを復元しました');
       renderScreen('backup');
     });
