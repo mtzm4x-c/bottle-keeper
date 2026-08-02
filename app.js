@@ -100,25 +100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-home').addEventListener('click', () => renderScreen('add'));
   document.getElementById('btn-title-home').addEventListener('click', () => renderScreen('add'));
-  document.getElementById('btn-reload').addEventListener('click', async () => {
-    if (hasUnsyncedLocalChanges()) {
-      const body = `<div class="warning-box">⚠ この端末にはまだ送信していない変更が残っている可能性があります。先に取得すると、その変更が失われることがあります。</div><p>再読込の前に、最新の共有データを取得しますか？</p>`;
-      const actions = `
-        <button class="btn btn-ghost" id="m-skip">取得せず再読込する</button>
-        <button class="btn btn-primary" id="m-pull">取得してから再読込する</button>
-      `;
-      const box = openModal('再読込', body, actions);
-      box.querySelector('#m-skip').addEventListener('click', () => location.reload());
-      box.querySelector('#m-pull').addEventListener('click', async () => {
-        closeModal();
-        await pullFromSpreadsheet(false);
-        location.reload();
-      });
-    } else {
-      await pullFromSpreadsheet(false);
-      location.reload();
-    }
-  });
+  document.getElementById('btn-reload').addEventListener('click', () => location.reload());
 
   let restoredScreen = 'add';
   try {
