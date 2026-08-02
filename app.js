@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   maybeShowBackupReminder();
 });
 
-async function refreshCache() {
+async function refreshCache(triggerAutoSync = true) {
   const [customers, bottles, visits, disposalHistory, operationLogs] = await Promise.all([
     APP.storage.getAllCustomers(),
     APP.storage.getAllBottles(),
@@ -150,7 +150,7 @@ async function refreshCache() {
   APP.visits = visits;
   APP.disposalHistory = disposalHistory;
   APP.operationLogs = operationLogs;
-  scheduleAutoSync();
+  if (triggerAutoSync) scheduleAutoSync();
 }
 
 // データが更新されるたびに呼ばれる。自動同期がONの場合、
@@ -2800,7 +2800,7 @@ async function importAllPreservingSyncSettings(data) {
     simpleModeCustomer: APP.settings.simpleModeCustomer,
   };
   await APP.storage.importAll(data);
-  await refreshCache();
+  await refreshCache(false);
   const restored = await APP.storage.getSettings();
   APP.settings = { ...DEFAULT_SETTINGS, ...restored, ...preserved };
   await APP.storage.putSettings(APP.settings);
