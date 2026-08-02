@@ -156,16 +156,50 @@ async function refreshCache() {
 // データが更新されるたびに呼ばれる。自動同期がONの場合、
 // 短時間に何度も送信しないよう少し待ってからまとめて同期する（デバウンス）
 let autoSyncTimer = null;
-function scheduleAutoSync() {
+let syncInFlight = false;
+let syncQueued = false;
+
+async function scheduleAutoSync() {
   if (!APP.settings.sheetAutoSync) return;
-  if (autoSyncTimer) clearTimeout(autoSyncTimer);
-  autoSyncTimer = null;
-  // 変更のたびに即座に送信する（待ち時間なし）
-  syncToSpreadsheet(true);
+  if (autoSyncTimer) { clearTimeout(autoSyncTimer); autoSyncTimer = null; }
+  if (syncInFlight) {
+    // 今まさに送信中の場合は、それが終わってから改めて1回だけ追いかけて送信する。
+    // 同時に複数の送信が飛ぶと、Google側でどちらが後に書き込まれるか保証されず、
+    // 新しいデータが後から届いた古いデータに上書きされてしまう事故につながるため。
+    syncQueued = true;
+    return;
+  }
+  syncInFlight = true;
+  try {
+    await syncToSpreadsheet(true);
+  } finally {
+    syncInFlight = false;
+    if (syncQueued) {
+      syncQueued = false;
+      scheduleAutoSync();
+    }
+  }
 }
 
 // 来店登録・統合など、ここで確実に送信しておきたい操作の直後に使う。
 // 保留中のデバウンス送信をキャンセルしてから即座に送信する（確認や通知は行わない、静かな送信）。
+async function manualSyncNow() {
+  if (syncInFlight) {
+    showToast('ちょうど自動送信中です。少し待ってからもう一度お試しください', 'warn');
+    return;
+  }
+  syncInFlight = true;
+  try {
+    await syncToSpreadsheet(false);
+  } finally {
+    syncInFlight = false;
+    if (syncQueued) {
+      syncQueued = false;
+      scheduleAutoSync();
+    }
+  }
+}
+
 function setupNav() {
   document.getElementById('sidenav').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-screen]');
@@ -2545,7 +2579,7 @@ function renderBackupScreen(root) {
     await APP.storage.putSettings(APP.settings);
     showToast('連携設定を保存しました');
   });
-  root.querySelector('#btn-sync-now').addEventListener('click', () => syncToSpreadsheet(false));
+  root.querySelector('#btn-sync-now').addEventListener('click', () => manualSyncNow());
   root.querySelector('#btn-pull-now').addEventListener('click', () => {
     const body = hasUnsyncedLocalChanges()
       ? `<div class="warning-box">⚠ この端末にはまだ送信していない変更が残っている可能性があります。先に取得すると、その変更は失われます。</div><p>共有データを取得して、この端末のデータを置き換えます。よろしいですか？</p>`
