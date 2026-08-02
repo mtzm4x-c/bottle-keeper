@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   maybeShowBackupReminder();
 });
 
-async function refreshCache(triggerAutoSync = true) {
+async function refreshCache() {
   const [customers, bottles, visits, disposalHistory, operationLogs] = await Promise.all([
     APP.storage.getAllCustomers(),
     APP.storage.getAllBottles(),
@@ -132,7 +132,7 @@ async function refreshCache(triggerAutoSync = true) {
   APP.visits = visits;
   APP.disposalHistory = disposalHistory;
   APP.operationLogs = operationLogs;
-  if (triggerAutoSync) scheduleAutoSync();
+  scheduleAutoSync();
 }
 
 // データが更新されるたびに呼ばれる。自動同期がONの場合、
@@ -141,21 +141,7 @@ let autoSyncTimer = null;
 function scheduleAutoSync() {
   if (!APP.settings.sheetAutoSync) return;
   if (autoSyncTimer) clearTimeout(autoSyncTimer);
-  // 以前は4秒のデバウンスだったが、その間にタブを閉じる・画面を切り替えるなどすると
-  // 送信されないまま消えてしまう事故が多かったため、ごく短い遅延に短縮した
-  // （複数の変更が同時に起きた時に送信をまとめるための最小限の待ち時間のみ）
-  autoSyncTimer = setTimeout(() => { syncToSpreadsheet(true); }, 300);
-}
-
-// 重要な操作（統合・来店登録等）の直後に使う。保留中のデバウンス送信をキャンセルしてから
-// 即座に送信することで、「即時送信の直後にもう一度、別のタイムスタンプで自動送信される」
-// のを防ぐ（そうなると送信確認が別のデータと比較されてしまい、誤って失敗と表示される）。
-async function forceSyncNow() {
-  if (autoSyncTimer) {
-    clearTimeout(autoSyncTimer);
-    autoSyncTimer = null;
-  }
-  return syncToSpreadsheet(true);
+  autoSyncTimer = setTimeout(() => { syncToSpreadsheet(true); }, 4000);
 }
 
 function setupNav() {
@@ -753,7 +739,6 @@ async function handleAddSubmit(root) {
   }
 
   await refreshCache();
-  await forceSyncNow(); // 確実にすぐ共有されるよう、登録後は即座に送信する
   showToast(`${rows.length}本登録しました（${createdLabels.join('、')}）`);
   renderScreen('add');
 }
@@ -840,7 +825,6 @@ async function applyVisitDateToBottles(customerId, visitDate) {
 async function registerVisit(customerId, visitDate) {
   const count = await applyVisitDateToBottles(customerId, visitDate);
   await refreshCache();
-  await forceSyncNow(); // 来店登録は最も頻繁な操作のため、確実に即座に送信する
   showToast(`${count}本のボトルの最終来店日を更新しました`);
   renderScreen(APP.currentScreen);
 }
@@ -1378,7 +1362,6 @@ async function mergeCustomerGroup(memberIds, newName, newKana) {
   await refreshCache();
   await syncCustomerLastVisitToLatest(anchor.id);
   await refreshCache();
-  await forceSyncNow(); // 統合は重要な操作のため、デバウンスを待たず即座に送信する
   showToast(`${members.length}人を「${newName}」様に統合しました`);
   renderScreen('merge');
 }
@@ -1629,7 +1612,6 @@ function renderMergeScreen(root) {
     await refreshCache();
     await syncCustomerLastVisitToLatest(targetCustomer.id);
     await refreshCache();
-    await forceSyncNow(); // 統合は重要な操作のため、デバウンスを待たず即座に送信する
     showToast(`${sourceBottles.length}本を ${finalName} 様に統合しました`);
     renderScreen('merge');
   });
@@ -1812,7 +1794,6 @@ async function discardBottle(bottleId, remainingAmount, afterScreen = 'disposal-
 
   delete APP.remainingDraft[bottleId];
   await refreshCache();
-  await forceSyncNow(); // 確実にすぐ共有されるよう、破棄後は即座に送信する
   showToast(`${bottle.bottleType} No.${before.bottleNo} を破棄しました`);
   renderScreen(afterScreen);
 }
@@ -2349,7 +2330,6 @@ async function saveDetailScreenChanges(root, bottle, customer) {
   }
 
   await refreshCache();
-  await forceSyncNow(); // 確実にすぐ共有されるよう、保存後は即座に送信する
   showToast(visitCount > 0 ? `保存しました（${visitCount}本の最終来店日を更新）` : '保存しました');
   return true;
 }
@@ -2724,36 +2704,15 @@ async function syncToSpreadsheet(silent = false) {
     if (!silent) showToast('この端末にはデータが1件もないため、送信を中止しました（共有データを誤って消さないための安全対策です）。先に「取得（プル）」を行ってください。', 'error');
     return false;
   }
-  const payload = buildSpreadsheetPayload();
   try {
-    await submitViaHiddenForm(url, JSON.stringify(payload));
+    await submitViaHiddenForm(url, JSON.stringify(buildSpreadsheetPayload()));
     APP.settings.lastSheetPushAt = BKUtil.nowISO();
     await APP.storage.putSettings(APP.settings);
     updateSheetSyncStatus();
-
-    if (!silent) showToast('送信しました。反映を確認しています…');
-
-    // 送信の仕組み上（クロスオリジンのため）その場で成否を確認できないので、
-    // 少し待ってから実際に取得し直し、本当に反映されたかを確認する。
-    // サイレント送信（来店チェック・統合等の後の自動送信）でも、
-    // 成功時は静かに、失敗時だけは必ず目立つように知らせる。
-    setTimeout(async () => {
-      try {
-        const cellValue = await fetchSheetColumnViaGviz(BUILT_IN_SPREADSHEET_ID, '_共有データ');
-        const remote = cellValue ? JSON.parse(cellValue) : null;
-        if (remote && remote.exportedAt === payload.rawExport.exportedAt) {
-          if (!silent) showToast('確認できました。スプレッドシートに反映されています');
-        } else {
-          showToast('送信の反映を確認できませんでした。他の端末に届いていない可能性があります。Wi-Fi接続をご確認のうえ、「今すぐ送信する」をもう一度お試しください', 'error');
-        }
-      } catch (verifyErr) {
-        showToast('送信の確認中にエラーが発生しました。反映状況を後ほどご確認ください', 'warn');
-      }
-    }, 4500);
-
+    if (!silent) showToast('スプレッドシートへ送信しました（反映まで数秒かかることがあります）');
     return true;
   } catch (err) {
-    showToast('同期に失敗しました。Wi-Fi接続とURLをご確認ください', 'error');
+    if (!silent) showToast('同期に失敗しました。Wi-Fi接続とURLをご確認ください', 'error');
     return false;
   }
 }
@@ -2780,7 +2739,7 @@ async function importAllPreservingSyncSettings(data) {
     simpleModeCustomer: APP.settings.simpleModeCustomer,
   };
   await APP.storage.importAll(data);
-  await refreshCache(false);
+  await refreshCache();
   const restored = await APP.storage.getSettings();
   APP.settings = { ...DEFAULT_SETTINGS, ...restored, ...preserved };
   await APP.storage.putSettings(APP.settings);
@@ -2934,7 +2893,6 @@ function confirmOverwriteImport(data) {
     box2.querySelector('#m-cancel2').addEventListener('click', closeModal);
     box2.querySelector('#m-confirm2').addEventListener('click', async () => {
       await importAllPreservingSyncSettings(data);
-      await forceSyncNow(); // JSON復元は意図的なローカル変更のため、他端末にも共有する
       closeModal();
       showToast('データを復元しました');
       renderScreen('backup');
