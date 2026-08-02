@@ -2590,9 +2590,9 @@ function isBackupOverdue() {
 function updateBackupStatusBadge() {
   const el = document.getElementById('backup-status');
   const s = APP.settings;
-  const overdue = isBackupOverdue();
-  el.textContent = `最終バックアップ: ${s.lastBackupAt ? new Date(s.lastBackupAt).toLocaleString('ja-JP') : '未実施'}`;
-  el.classList.toggle('backup-status--warn', overdue);
+  const pushText = s.lastSheetPushAt ? new Date(s.lastSheetPushAt).toLocaleString('ja-JP') : '未実施';
+  const pullText = s.lastSheetPullAt ? new Date(s.lastSheetPullAt).toLocaleString('ja-JP') : '未実施';
+  el.innerHTML = `プッシュ: ${pushText}<br>プル: ${pullText}`;
 }
 
 function maybeShowBackupReminder() {
@@ -2713,8 +2713,9 @@ function submitViaHiddenForm(url, payloadJson) {
     document.body.appendChild(form);
     form.submit();
     form.remove();
-    // iframeの中身はクロスオリジンのため読み取れない。送信自体が完了するまで少し待つ。
-    setTimeout(resolve, 1500);
+    // iframeの中身はクロスオリジンのため読み取れない。送信・サーバー側の処理が完了するまで待つ。
+    // データ件数が増えるほど（分割書き込みのため）時間がかかることがあるので、余裕を持って待つ。
+    setTimeout(resolve, 5000);
   });
 }
 
@@ -2868,11 +2869,11 @@ async function pullFromSpreadsheet(silent = false) {
 
 function updateSheetSyncStatus() {
   const el = document.getElementById('sheet-sync-status');
-  if (!el) return;
   const s = APP.settings;
   const pushText = s.lastSheetPushAt ? `最終プッシュ：${new Date(s.lastSheetPushAt).toLocaleString('ja-JP')}` : '最終プッシュ：未実施';
   const pullText = s.lastSheetPullAt ? `最終プル：${new Date(s.lastSheetPullAt).toLocaleString('ja-JP')}` : '最終プル：未実施';
-  el.innerHTML = `${pushText}<br>${pullText}`;
+  if (el) el.innerHTML = `${pushText}<br>${pullText}`;
+  updateBackupStatusBadge();
 }
 
 function handleJsonImport(file) {
