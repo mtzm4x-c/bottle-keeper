@@ -147,6 +147,17 @@ function scheduleAutoSync() {
   autoSyncTimer = setTimeout(() => { syncToSpreadsheet(true); }, 300);
 }
 
+// 重要な操作（統合・来店登録等）の直後に使う。保留中のデバウンス送信をキャンセルしてから
+// 即座に送信することで、「即時送信の直後にもう一度、別のタイムスタンプで自動送信される」
+// のを防ぐ（そうなると送信確認が別のデータと比較されてしまい、誤って失敗と表示される）。
+async function forceSyncNow() {
+  if (autoSyncTimer) {
+    clearTimeout(autoSyncTimer);
+    autoSyncTimer = null;
+  }
+  return syncToSpreadsheet(true);
+}
+
 function setupNav() {
   document.getElementById('sidenav').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-screen]');
@@ -742,7 +753,7 @@ async function handleAddSubmit(root) {
   }
 
   await refreshCache();
-  await syncToSpreadsheet(true); // 確実にすぐ共有されるよう、登録後は即座に送信する
+  await forceSyncNow(); // 確実にすぐ共有されるよう、登録後は即座に送信する
   showToast(`${rows.length}本登録しました（${createdLabels.join('、')}）`);
   renderScreen('add');
 }
@@ -829,7 +840,7 @@ async function applyVisitDateToBottles(customerId, visitDate) {
 async function registerVisit(customerId, visitDate) {
   const count = await applyVisitDateToBottles(customerId, visitDate);
   await refreshCache();
-  await syncToSpreadsheet(true); // 来店登録は最も頻繁な操作のため、確実に即座に送信する
+  await forceSyncNow(); // 来店登録は最も頻繁な操作のため、確実に即座に送信する
   showToast(`${count}本のボトルの最終来店日を更新しました`);
   renderScreen(APP.currentScreen);
 }
@@ -1367,7 +1378,7 @@ async function mergeCustomerGroup(memberIds, newName, newKana) {
   await refreshCache();
   await syncCustomerLastVisitToLatest(anchor.id);
   await refreshCache();
-  await syncToSpreadsheet(true); // 統合は重要な操作のため、デバウンスを待たず即座に送信する
+  await forceSyncNow(); // 統合は重要な操作のため、デバウンスを待たず即座に送信する
   showToast(`${members.length}人を「${newName}」様に統合しました`);
   renderScreen('merge');
 }
@@ -1618,7 +1629,7 @@ function renderMergeScreen(root) {
     await refreshCache();
     await syncCustomerLastVisitToLatest(targetCustomer.id);
     await refreshCache();
-    await syncToSpreadsheet(true); // 統合は重要な操作のため、デバウンスを待たず即座に送信する
+    await forceSyncNow(); // 統合は重要な操作のため、デバウンスを待たず即座に送信する
     showToast(`${sourceBottles.length}本を ${finalName} 様に統合しました`);
     renderScreen('merge');
   });
@@ -1801,7 +1812,7 @@ async function discardBottle(bottleId, remainingAmount, afterScreen = 'disposal-
 
   delete APP.remainingDraft[bottleId];
   await refreshCache();
-  await syncToSpreadsheet(true); // 確実にすぐ共有されるよう、破棄後は即座に送信する
+  await forceSyncNow(); // 確実にすぐ共有されるよう、破棄後は即座に送信する
   showToast(`${bottle.bottleType} No.${before.bottleNo} を破棄しました`);
   renderScreen(afterScreen);
 }
@@ -2338,7 +2349,7 @@ async function saveDetailScreenChanges(root, bottle, customer) {
   }
 
   await refreshCache();
-  await syncToSpreadsheet(true); // 確実にすぐ共有されるよう、保存後は即座に送信する
+  await forceSyncNow(); // 確実にすぐ共有されるよう、保存後は即座に送信する
   showToast(visitCount > 0 ? `保存しました（${visitCount}本の最終来店日を更新）` : '保存しました');
   return true;
 }
@@ -2923,7 +2934,7 @@ function confirmOverwriteImport(data) {
     box2.querySelector('#m-cancel2').addEventListener('click', closeModal);
     box2.querySelector('#m-confirm2').addEventListener('click', async () => {
       await importAllPreservingSyncSettings(data);
-      await syncToSpreadsheet(true); // JSON復元は意図的なローカル変更のため、他端末にも共有する
+      await forceSyncNow(); // JSON復元は意図的なローカル変更のため、他端末にも共有する
       closeModal();
       showToast('データを復元しました');
       renderScreen('backup');
