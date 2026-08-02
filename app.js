@@ -2738,6 +2738,7 @@ async function submitViaHiddenForm(url, payloadJson) {
   // シンプルでこうした制約を受けにくいため、こちらに切り替える。
   // no-corsモードのため成否はレスポンスから読み取れないが、Apps Script側は
   // e.postData.contents（生のPOST本文）を読む実装に既になっているので、そのまま送れる。
+  let fetchError = null;
   try {
     await fetch(url, {
       method: 'POST',
@@ -2746,31 +2747,11 @@ async function submitViaHiddenForm(url, payloadJson) {
       body: payloadJson,
     });
   } catch (err) {
-    // no-corsのfetch自体は通常reject（拒否）されないが、念のため握りつぶさず再送を試みる
-    // フォールバックとして、従来の隠しiframe方式も試す
-    await new Promise((resolve) => {
-      let iframe = document.getElementById('gas-sync-frame');
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'gas-sync-frame';
-        iframe.name = 'gas-sync-frame';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-      }
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = url;
-      form.target = 'gas-sync-frame';
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'payload';
-      input.value = payloadJson;
-      form.appendChild(input);
-      document.body.appendChild(form);
-      form.submit();
-      form.remove();
-      setTimeout(resolve, 5000);
-    });
+    fetchError = err;
+    console.error('[BottleKeeper] fetch送信でエラー:', err);
+  }
+  if (fetchError) {
+    throw new Error(`ネットワーク送信に失敗しました：${fetchError.message || fetchError}`);
   }
   // サーバー側の処理（分割書き込み等）が完了するまで少し待つ
   await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -2796,7 +2777,8 @@ async function syncToSpreadsheet(silent = false) {
     if (!silent) showToast('スプレッドシートへ送信しました');
     return true;
   } catch (err) {
-    if (!silent) showToast('同期に失敗しました。Wi-Fi接続とURLをご確認ください', 'error');
+    console.error('[BottleKeeper] 送信エラー:', err);
+    if (!silent) showToast(`同期に失敗しました：${err && err.message ? err.message : err}`, 'error');
     return false;
   }
 }
