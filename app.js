@@ -146,14 +146,6 @@ function scheduleAutoSync() {
 
 // 来店登録・統合など、ここで確実に送信しておきたい操作の直後に使う。
 // 保留中のデバウンス送信をキャンセルしてから即座に送信する（確認や通知は行わない、静かな送信）。
-async function forceSyncNow() {
-  if (autoSyncTimer) {
-    clearTimeout(autoSyncTimer);
-    autoSyncTimer = null;
-  }
-  return syncToSpreadsheet(true);
-}
-
 function setupNav() {
   document.getElementById('sidenav').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-screen]');
@@ -749,7 +741,6 @@ async function handleAddSubmit(root) {
   }
 
   await refreshCache();
-  await forceSyncNow();
   showToast(`${rows.length}本登録しました（${createdLabels.join('、')}）`);
   renderScreen('add');
 }
@@ -836,7 +827,6 @@ async function applyVisitDateToBottles(customerId, visitDate) {
 async function registerVisit(customerId, visitDate) {
   const count = await applyVisitDateToBottles(customerId, visitDate);
   await refreshCache();
-  await forceSyncNow();
   showToast(`${count}本のボトルの最終来店日を更新しました`);
   renderScreen(APP.currentScreen);
 }
@@ -1374,7 +1364,6 @@ async function mergeCustomerGroup(memberIds, newName, newKana) {
   await refreshCache();
   await syncCustomerLastVisitToLatest(anchor.id);
   await refreshCache();
-  await forceSyncNow();
   showToast(`${members.length}人を「${newName}」様に統合しました`);
   renderScreen('merge');
 }
@@ -1625,7 +1614,6 @@ function renderMergeScreen(root) {
     await refreshCache();
     await syncCustomerLastVisitToLatest(targetCustomer.id);
     await refreshCache();
-    await forceSyncNow();
     showToast(`${sourceBottles.length}本を ${finalName} 様に統合しました`);
     renderScreen('merge');
   });
@@ -1808,7 +1796,6 @@ async function discardBottle(bottleId, remainingAmount, afterScreen = 'disposal-
 
   delete APP.remainingDraft[bottleId];
   await refreshCache();
-  await forceSyncNow();
   showToast(`${bottle.bottleType} No.${before.bottleNo} を破棄しました`);
   renderScreen(afterScreen);
 }
@@ -2345,7 +2332,6 @@ async function saveDetailScreenChanges(root, bottle, customer) {
   }
 
   await refreshCache();
-  await forceSyncNow();
   showToast(visitCount > 0 ? `保存しました（${visitCount}本の最終来店日を更新）` : '保存しました');
   return true;
 }
@@ -2828,13 +2814,6 @@ async function pullFromSpreadsheet(silent = false) {
   let cellValue;
   try {
     cellValue = await fetchSheetColumnViaGviz(BUILT_IN_SPREADSHEET_ID, '_共有データ');
-    // 手動での取得は、他の端末が送信した直後だとGoogle側の反映が遅れていることがあるため、
-    // 少し待ってもう一度だけ読み直す（起動時の自動取得は速度優先で1回のみ）。
-    if (!silent) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const retryValue = await fetchSheetColumnViaGviz(BUILT_IN_SPREADSHEET_ID, '_共有データ');
-      if (retryValue) cellValue = retryValue;
-    }
   } catch (err) {
     if (!silent) showToast(`取得に失敗しました（${err && err.message ? err.message : err}）`, 'error');
     return false;
@@ -2923,7 +2902,6 @@ function confirmOverwriteImport(data) {
     box2.querySelector('#m-confirm2').addEventListener('click', async () => {
       await importAllPreservingSyncSettings(data);
       closeModal();
-      await forceSyncNow();
       showToast('データを復元しました');
       renderScreen('backup');
     });
