@@ -141,7 +141,9 @@ let autoSyncTimer = null;
 function scheduleAutoSync() {
   if (!APP.settings.sheetAutoSync) return;
   if (autoSyncTimer) clearTimeout(autoSyncTimer);
-  autoSyncTimer = setTimeout(() => { syncToSpreadsheet(true); }, 4000);
+  autoSyncTimer = null;
+  // 変更のたびに即座に送信する（待ち時間なし）
+  syncToSpreadsheet(true);
 }
 
 // 来店登録・統合など、ここで確実に送信しておきたい操作の直後に使う。
