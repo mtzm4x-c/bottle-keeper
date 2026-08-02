@@ -2738,7 +2738,7 @@ async function syncToSpreadsheet(silent = false) {
       } catch (verifyErr) {
         showToast('送信の確認中にエラーが発生しました。反映状況を後ほどご確認ください', 'warn');
       }
-    }, 2500);
+    }, 4500);
 
     return true;
   } catch (err) {
