@@ -314,7 +314,7 @@ html, body {
 .btn:active { transform: scale(0.97); }
 .btn-primary { background: var(--color-accent-strong); color: #FFFFFF; }
 .btn-primary:active { filter: brightness(1.1); }
-.btn-visit { background: var(--color-accent); color: #FFFFFF; }
+.btn-visit { background: #2E8B4F; color: #FFFFFF; }
 .btn-visit:active { filter: brightness(1.1); }
 .btn-danger { background: var(--color-danger); color: #FFFFFF; }
 .btn-danger:active { filter: brightness(1.1); }
@@ -463,13 +463,13 @@ table.data-table--fixed th {
   padding: 0;
   font: inherit;
   font-weight: 700;
-  color: var(--color-accent-strong);
+  color: var(--color-text);
   text-decoration: underline;
   text-decoration-color: var(--color-border);
   text-align: left;
   cursor: pointer;
 }
-.customer-link:active { color: var(--color-accent); }
+.customer-link:active { color: var(--color-accent-strong); }
 
 /* ボトルNo. 札 */
 .bottle-tag {
@@ -506,7 +506,7 @@ table.data-table--fixed th {
 
 .bottle-tag--matsurika { border-color: #1F3A63; background: #1F3A63; }
 
-.bottle-tag--jameson { border-color: #276B3D; background: #276B3D; }
+.bottle-tag--jameson { border-color: #5B2C6F; background: #5B2C6F; }
 
 .bottle-tag--takara { border-color: #B5241F; background: #B5241F; }
 

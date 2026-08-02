@@ -2709,7 +2709,11 @@ async function syncToSpreadsheet(silent = false) {
     APP.settings.lastSheetPushAt = BKUtil.nowISO();
     await APP.storage.putSettings(APP.settings);
     updateSheetSyncStatus();
-    if (!silent) showToast('スプレッドシートへ送信しました（反映まで数秒かかることがあります）');
+    // 補足：送信の仕組み上（クロスオリジンのため）、届いたかをその場で確実に検証することはできない。
+    // 以前は取得し直して照合する確認を行っていたが、Google側の読み取りキャッシュの影響で
+    // 実際は成功しているのに失敗と誤判定することが多く、かえって混乱を招くため取りやめた。
+    // 確実に確認したい場合は、スプレッドシートの「_共有データ」シートを直接開いて確認するのが最も確実。
+    if (!silent) showToast('スプレッドシートへ送信しました');
     return true;
   } catch (err) {
     if (!silent) showToast('同期に失敗しました。Wi-Fi接続とURLをご確認ください', 'error');
@@ -2802,6 +2806,8 @@ function fetchSheetColumnViaGviz(sheetId, sheetName, timeoutMs = 15000) {
   });
 }
 
+// gviz経由の読み取りは、書き込み直後は少し古い内容を返すことがある（Google側の反映ラグ）。
+// そのため何度か読み直し、その中で一番新しい exportedAt のものを採用する。
 async function pullFromSpreadsheet(silent = false) {
   let cellValue;
   try {
