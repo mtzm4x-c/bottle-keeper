@@ -2828,6 +2828,13 @@ async function pullFromSpreadsheet(silent = false) {
   let cellValue;
   try {
     cellValue = await fetchSheetColumnViaGviz(BUILT_IN_SPREADSHEET_ID, '_共有データ');
+    // 手動での取得は、他の端末が送信した直後だとGoogle側の反映が遅れていることがあるため、
+    // 少し待ってもう一度だけ読み直す（起動時の自動取得は速度優先で1回のみ）。
+    if (!silent) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const retryValue = await fetchSheetColumnViaGviz(BUILT_IN_SPREADSHEET_ID, '_共有データ');
+      if (retryValue) cellValue = retryValue;
+    }
   } catch (err) {
     if (!silent) showToast(`取得に失敗しました（${err && err.message ? err.message : err}）`, 'error');
     return false;
