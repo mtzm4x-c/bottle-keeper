@@ -38,8 +38,6 @@ const DEFAULT_SETTINGS = {
   backupReminderIntervalDays: 7,
   lastBackupAt: null,
   sheetSyncUrl: '',                 // Google Apps Script（Webアプリ）のURL（空の場合はBUILT_IN_SHEET_SYNC_URLを使用）
-  sheetAutoSync: true,              // データ変更のたびに自動で同期する（プッシュ）か
-  sheetAutoPullOnStart: true,       // 起動時に自動で共有データを取得（プル）するか
   lastSheetPushAt: null,
   lastSheetPullAt: null,
   dismissedMergePairs: [],
@@ -86,15 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   APP.settings = settings;
 
-  await refreshCache(false);
-
-  if (APP.settings.sheetAutoPullOnStart) {
-    if (hasUnsyncedLocalChanges()) {
-      showToast('未送信のローカル変更が残っているため、起動時の自動取得をスキップしました。「今すぐ送信する」を先に行ってください。', 'warn');
-    } else {
-      pullFromSpreadsheet(true); // 起動を待たせないよう、完了を待たずバックグラウンドで実行
-    }
-  }
+  await refreshCache();
 
   setupNav();
 
@@ -120,7 +110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   maybeShowBackupReminder();
 });
 
-async function refreshCache(triggerAutoSync = true) {
+async function refreshCache() {
   const [customers, bottles, visits, disposalHistory, operationLogs] = await Promise.all([
     APP.storage.getAllCustomers(),
     APP.storage.getAllBottles(),
@@ -133,42 +123,14 @@ async function refreshCache(triggerAutoSync = true) {
   APP.visits = visits;
   APP.disposalHistory = disposalHistory;
   APP.operationLogs = operationLogs;
-  if (triggerAutoSync) scheduleAutoSync();
 }
 
-// データが更新されるたびに呼ばれる。自動同期がONの場合、
-// 短時間に何度も送信しないよう少し待ってからまとめて同期する（デバウンス）
-let autoSyncTimer = null;
+// 送信は自動では一切行わない。「サーバーに送信する」ボタンを押した時だけ送信する。
 let syncInFlight = false;
-let syncQueued = false;
 
-async function scheduleAutoSync() {
-  if (!APP.settings.sheetAutoSync) return;
-  if (autoSyncTimer) { clearTimeout(autoSyncTimer); autoSyncTimer = null; }
-  if (syncInFlight) {
-    // 今まさに送信中の場合は、それが終わってから改めて1回だけ追いかけて送信する。
-    // 同時に複数の送信が飛ぶと、Google側でどちらが後に書き込まれるか保証されず、
-    // 新しいデータが後から届いた古いデータに上書きされてしまう事故につながるため。
-    syncQueued = true;
-    return;
-  }
-  syncInFlight = true;
-  try {
-    await syncToSpreadsheet(true);
-  } finally {
-    syncInFlight = false;
-    if (syncQueued) {
-      syncQueued = false;
-      scheduleAutoSync();
-    }
-  }
-}
-
-// 来店登録・統合など、ここで確実に送信しておきたい操作の直後に使う。
-// 保留中のデバウンス送信をキャンセルしてから即座に送信する（確認や通知は行わない、静かな送信）。
 async function manualSyncNow() {
   if (syncInFlight) {
-    showToast('ちょうど自動送信中です。少し待ってからもう一度お試しください', 'warn');
+    showToast('ちょうど送信中です。少し待ってからもう一度お試しください', 'warn');
     return;
   }
   syncInFlight = true;
@@ -176,10 +138,6 @@ async function manualSyncNow() {
     await syncToSpreadsheet(false);
   } finally {
     syncInFlight = false;
-    if (syncQueued) {
-      syncQueued = false;
-      scheduleAutoSync();
-    }
   }
 }
 
@@ -2462,30 +2420,17 @@ function renderBackupScreen(root) {
     <h2 class="screen-title">設定</h2>
 
     <div class="panel">
-      <h3 class="mt-0">データ連携（プッシュ・プル）</h3>
-      <p class="text-muted">Google Apps Script のWebアプリ URLを設定すると、スプレッドシートへバックアップを送信（プッシュ）したり、他の端末が入力したデータを取得（プル）したりできます。Wi-Fi接続時のみ動作します。</p>
+      <h3 class="mt-0">サーバーとの連携</h3>
+      <p class="text-muted">Google Apps Script のWebアプリ URLを設定すると、スプレッドシートへデータを送信できます。自動での送受信は行わず、ボタンを押した時だけ通信します。Wi-Fi接続時のみ動作します。</p>
       <div class="form-field form-field--full">
         <label>Google Apps Script のURL</label>
         <input type="text" id="s-sheetUrl" value="${escapeHtml(s.sheetSyncUrl || '')}" placeholder="空欄の場合、組み込みのURLが自動で使われます">
         <p class="text-faint" style="font-size:12px; margin-top:4px;">通常はこのまま空欄で問題ありません。別のスプレッドシートに切り替えたい場合のみ入力してください。</p>
       </div>
-      <div class="form-field">
-        <label class="checkbox-field">
-          <input type="checkbox" id="s-autoSync" ${s.sheetAutoSync ? 'checked' : ''}>
-          データ変更のたびに自動で送信（プッシュ）する
-        </label>
-      </div>
-      <div class="form-field">
-        <label class="checkbox-field">
-          <input type="checkbox" id="s-autoPull" ${s.sheetAutoPullOnStart ? 'checked' : ''}>
-          起動時に自動で共有データを取得（プル）する
-        </label>
-      </div>
       <p class="text-muted" id="sheet-sync-status">${pushText}<br>${pullText}</p>
       <div class="flex-row" style="margin-top:8px;">
         <button class="btn btn-primary" id="btn-save-sheetsync">連携設定を保存</button>
-        <button class="btn btn-ghost" id="btn-sync-now">今すぐ送信する（プッシュ）</button>
-        <button class="btn btn-ghost" id="btn-pull-now">最新の共有データを取得する（プル）</button>
+        <button class="btn btn-ghost" id="btn-sync-now">サーバーに送信する</button>
       </div>
       <div class="warning-box" style="margin-top:12px;">
         ⚠ 複数の端末でほぼ同時に入力すると、後から送信した方の内容で上書きされる場合があります。同時に同じお客様を編集しないようご注意ください。
@@ -2498,6 +2443,7 @@ function renderBackupScreen(root) {
       <div class="flex-row">
         <button class="btn btn-primary" id="btn-export-json">JSONバックアップを書き出す</button>
         <button class="btn btn-ghost" id="btn-export-csv">CSVで一覧を書き出す</button>
+        <button class="btn btn-ghost" id="btn-pull-now">サーバーからデータを受信して最新の状態にする</button>
       </div>
       <div class="form-field form-field--full" style="margin-top:16px;">
         <label>JSONバックアップから復元</label>
@@ -2563,8 +2509,6 @@ function renderBackupScreen(root) {
 
   root.querySelector('#btn-save-sheetsync').addEventListener('click', async () => {
     APP.settings.sheetSyncUrl = root.querySelector('#s-sheetUrl').value.trim();
-    APP.settings.sheetAutoSync = root.querySelector('#s-autoSync').checked;
-    APP.settings.sheetAutoPullOnStart = root.querySelector('#s-autoPull').checked;
     await APP.storage.putSettings(APP.settings);
     showToast('連携設定を保存しました');
   });
@@ -2598,8 +2542,7 @@ function renderBackupScreen(root) {
     newSettings.maxBottleNoByType = maxByType;
     APP.settings = newSettings;
     await APP.storage.putSettings(newSettings);
-    scheduleAutoSync();
-    showToast('設定を保存しました');
+    showToast('設定を保存しました（他の端末と共有するには「サーバーに送信する」を押してください）');
   });
 }
 
@@ -2784,8 +2727,6 @@ function hasUnsyncedLocalChanges() {
 async function importAllPreservingSyncSettings(data) {
   const preserved = {
     sheetSyncUrl: APP.settings.sheetSyncUrl,
-    sheetAutoSync: APP.settings.sheetAutoSync,
-    sheetAutoPullOnStart: APP.settings.sheetAutoPullOnStart,
     lastSheetPushAt: APP.settings.lastSheetPushAt,
     lastSheetPullAt: APP.settings.lastSheetPullAt,
     simpleModeBottle: APP.settings.simpleModeBottle,
@@ -2795,7 +2736,7 @@ async function importAllPreservingSyncSettings(data) {
     lastLocalMutationAt: null,
   };
   await APP.storage.importAll(data);
-  await refreshCache(false);
+  await refreshCache();
   const restored = await APP.storage.getSettings();
   APP.settings = { ...DEFAULT_SETTINGS, ...restored, ...preserved };
   await APP.storage.putSettings(APP.settings);
