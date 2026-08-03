@@ -44,6 +44,7 @@ const DEFAULT_SETTINGS = {
   simpleModeBottle: true,
   lastLocalMutationAt: null,
   simpleModeCustomer: true,
+  deviceNickname: '',
 };
 
 // ==========================================================================
@@ -2420,41 +2421,11 @@ function renderBackupScreen(root) {
     <h2 class="screen-title">設定</h2>
 
     <div class="panel">
-      <h3 class="mt-0">サーバーとの連携</h3>
-      <p class="text-muted">Google Apps Script のWebアプリ URLを設定すると、スプレッドシートへデータを送信できます。自動での送受信は行わず、ボタンを押した時だけ通信します。Wi-Fi接続時のみ動作します。</p>
-      <div class="form-field form-field--full">
-        <label>Google Apps Script のURL</label>
-        <input type="text" id="s-sheetUrl" value="${escapeHtml(s.sheetSyncUrl || '')}" placeholder="空欄の場合、組み込みのURLが自動で使われます">
-        <p class="text-faint" style="font-size:12px; margin-top:4px;">通常はこのまま空欄で問題ありません。別のスプレッドシートに切り替えたい場合のみ入力してください。</p>
-      </div>
+      <h3 class="mt-0">締め作業</h3>
+      <p class="text-muted">営業終了後、この「サーバーに送信する」を押してください。今日入力した内容が他の端末・スプレッドシートに反映されます。</p>
       <p class="text-muted" id="sheet-sync-status">${pushText}<br>${pullText}</p>
       <div class="flex-row" style="margin-top:8px;">
-        <button class="btn btn-primary" id="btn-save-sheetsync">連携設定を保存</button>
-        <button class="btn btn-ghost" id="btn-sync-now">サーバーに送信する</button>
-      </div>
-      <div class="warning-box" style="margin-top:12px;">
-        ⚠ 複数の端末でほぼ同時に入力すると、後から送信した方の内容で上書きされる場合があります。同時に同じお客様を編集しないようご注意ください。
-      </div>
-    </div>
-
-    <div class="panel">
-      <h3 class="mt-0">バックアップ・復元（JSON・CSV）</h3>
-      <p>最終バックアップ日時：<b>${lastBackup}</b> ${overdue ? '<span class="status-pill status-target">バックアップを推奨します</span>' : ''}</p>
-      <div class="flex-row">
-        <button class="btn btn-primary" id="btn-export-json">JSONバックアップを書き出す</button>
-        <button class="btn btn-ghost" id="btn-export-csv">CSVで一覧を書き出す</button>
-        <button class="btn btn-ghost" id="btn-pull-now">サーバーからデータを受信して最新の状態にする</button>
-      </div>
-      <div class="form-field form-field--full" style="margin-top:16px;">
-        <label>JSONバックアップから復元</label>
-        <input type="file" id="file-json" accept="application/json">
-        <div class="form-error" id="err-import-json"></div>
-      </div>
-      <div class="form-field form-field--full">
-        <label>CSVインポート（既存スプレッドシートからの取り込み）</label>
-        <input type="file" id="file-csv" accept=".csv,text/csv">
-        <div class="form-error" id="err-import-csv"></div>
-        <p class="text-faint">列の順序：種類, ボトルNo.(空欄可), ボトル名(空欄可), ボトル名（カナ）(空欄可), お客様名, フリガナ, 来店日(YYYY-MM-DD), 特徴・注意事項, 星(TRUE/FALSE)</p>
+        <button class="btn btn-primary" id="btn-sync-now">サーバーに送信する</button>
       </div>
     </div>
 
@@ -2493,6 +2464,56 @@ function renderBackupScreen(root) {
     </div>
 
     <div class="panel">
+      <h3 class="mt-0">管理者用</h3>
+      <p class="text-muted">Google Apps Script のWebアプリ URLを設定すると、スプレッドシートへデータを送信できます。自動での送受信は行わず、ボタンを押した時だけ通信します。Wi-Fi接続時のみ動作します。</p>
+      <div class="form-field form-field--full">
+        <label>Google Apps Script のURL</label>
+        <input type="text" id="s-sheetUrl" value="${escapeHtml(s.sheetSyncUrl || '')}" placeholder="空欄の場合、組み込みのURLが自動で使われます">
+        <p class="text-faint" style="font-size:12px; margin-top:4px;">通常はこのまま空欄で問題ありません。別のスプレッドシートに切り替えたい場合のみ入力してください。</p>
+      </div>
+      <div class="flex-row" style="margin-top:8px;">
+        <button class="btn btn-primary" id="btn-save-sheetsync">連携設定を保存</button>
+        <button class="btn btn-ghost" id="btn-pull-now">サーバーからデータを受信して最新の状態にする</button>
+      </div>
+      <div class="warning-box" style="margin-top:12px;">
+        ⚠ 複数の端末でほぼ同時に入力すると、後から送信した方の内容で上書きされる場合があります。同時に同じお客様を編集しないようご注意ください。
+      </div>
+
+      <p style="margin-top:16px;"><a href="https://docs.google.com/spreadsheets/d/1wMGWhGP_eoVTexLiso93IlE2Ah5DWo-MdFh7y44lMfo/edit?gid=401829137#gid=401829137" target="_blank" rel="noopener">📊 データベース用スプレッドシートを開く</a></p>
+
+      <h4>バックアップ・復元（JSON・CSV）</h4>
+      <p>最終バックアップ日時：<b>${lastBackup}</b> ${overdue ? '<span class="status-pill status-target">バックアップを推奨します</span>' : ''}</p>
+      <div class="flex-row">
+        <button class="btn btn-primary" id="btn-export-json">JSONバックアップを書き出す</button>
+        <button class="btn btn-ghost" id="btn-export-csv">CSVで一覧を書き出す</button>
+      </div>
+      <div class="form-field form-field--full" style="margin-top:16px;">
+        <label>JSONバックアップから復元</label>
+        <input type="file" id="file-json" accept="application/json">
+        <div class="form-error" id="err-import-json"></div>
+      </div>
+      <div class="form-field form-field--full">
+        <label>CSVインポート（既存スプレッドシートからの取り込み）</label>
+        <input type="file" id="file-csv" accept=".csv,text/csv">
+        <div class="form-error" id="err-import-csv"></div>
+        <p class="text-faint">列の順序：種類, ボトルNo.(空欄可), ボトル名(空欄可), ボトル名（カナ）(空欄可), お客様名, フリガナ, 来店日(YYYY-MM-DD), 特徴・注意事項, 星(TRUE/FALSE)</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="mt-0">端末情報</h3>
+      <div class="form-field form-field--full">
+        <label>この端末のニックネーム（任意）</label>
+        <input type="text" id="s-deviceNickname" value="${escapeHtml(s.deviceNickname || '')}" placeholder="例：レジ横iPad、事務所PC">
+        <p class="text-faint" style="font-size:12px; margin-top:4px;">スプレッドシートの「同期状況」「送信ログ」に、どの端末から送信したか分かるように表示されます。空欄の場合は下の自動判定名が使われます。</p>
+      </div>
+      <p class="text-muted">自動判定：<b>${escapeHtml(getDeviceLabel())}</b></p>
+      <div class="flex-row" style="margin-top:8px;">
+        <button class="btn btn-ghost" id="btn-save-device">端末情報を保存</button>
+      </div>
+    </div>
+
+    <div class="panel">
       <h3 class="mt-0">履歴</h3>
       ${historyPanelHtml()}
     </div>
@@ -2511,6 +2532,11 @@ function renderBackupScreen(root) {
     APP.settings.sheetSyncUrl = root.querySelector('#s-sheetUrl').value.trim();
     await APP.storage.putSettings(APP.settings);
     showToast('連携設定を保存しました');
+  });
+  root.querySelector('#btn-save-device').addEventListener('click', async () => {
+    APP.settings.deviceNickname = root.querySelector('#s-deviceNickname').value.trim();
+    await APP.storage.putSettings(APP.settings);
+    showToast('端末情報を保存しました');
   });
   root.querySelector('#btn-sync-now').addEventListener('click', () => manualSyncNow());
   root.querySelector('#btn-pull-now').addEventListener('click', () => {
@@ -2602,6 +2628,31 @@ function exportCsv() {
 }
 
 // スプレッドシート連携：種類ごとにシートを分けた、以前のインポート元ファイルに近い形式で送る
+// 送信元の端末を分かりやすく表すラベルを作る。
+// 設定で「この端末のニックネーム」が指定されていればそれを使い、なければ
+// ブラウザのUser-Agentから簡易的に「iPad / Chrome」のような表記を組み立てる。
+function getDeviceLabel() {
+  const nickname = (APP.settings.deviceNickname || '').trim();
+  if (nickname) return nickname;
+
+  const ua = navigator.userAgent || '';
+  let os = 'その他の端末';
+  if (/iPad/.test(ua)) os = 'iPad';
+  else if (/iPhone/.test(ua)) os = 'iPhone';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Macintosh/.test(ua)) os = 'Mac';
+  else if (/Windows/.test(ua)) os = 'Windows';
+
+  let browser = '';
+  if (/CriOS/.test(ua)) browser = 'Chrome';
+  else if (/Chrome/.test(ua) && !/Edg/.test(ua)) browser = 'Chrome';
+  else if (/Safari/.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+  else if (/Firefox/.test(ua)) browser = 'Firefox';
+  else if (/Edg/.test(ua)) browser = 'Edge';
+
+  return browser ? `${os} / ${browser}` : os;
+}
+
 function buildSpreadsheetPayload() {
   const byTypeByNo = {};
   BOTTLE_TYPES.forEach((t) => { byTypeByNo[t] = {}; });
@@ -2637,6 +2688,7 @@ function buildSpreadsheetPayload() {
     rowsByType,
     totalCount: APP.bottles.filter((b) => b.status === 'active').length,
     syncedAt: BKUtil.nowISO(),
+    deviceLabel: getDeviceLabel(),
     // まるごと復元用の生データ（他端末が「取得」した時に使う）。
     // 操作履歴は際限なく増えるとスプレッドシートのセル上限に触れる恐れがあるため、直近300件のみ含める。
     rawExport: {
@@ -2730,6 +2782,7 @@ async function importAllPreservingSyncSettings(data) {
     lastSheetPushAt: APP.settings.lastSheetPushAt,
     lastSheetPullAt: APP.settings.lastSheetPullAt,
     simpleModeBottle: APP.settings.simpleModeBottle,
+    deviceNickname: APP.settings.deviceNickname,
     simpleModeCustomer: APP.settings.simpleModeCustomer,
     // プル直後は、この端末の状態は共有データと完全に一致しているはずなので、
     // 「まだ送信していない変更」は無いものとしてリセットする
