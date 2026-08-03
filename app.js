@@ -2714,29 +2714,32 @@ function buildSpreadsheetPayload() {
 // fetch + mode:'no-cors' は、Apps Script側でのリダイレクトの都合で
 // POSTの中身が実際には届かないことがある（届いたように見えて実は失敗する）ため、
 // 隠しiframe＋フォーム送信という、リダイレクトに強い方式で送信する
-async function submitViaHiddenForm(url, payloadJson) {
-  // 以前は隠しiframe＋フォーム送信で行っていたが、iPadでホーム画面に追加した状態（PWA的な起動）だと
-  // iframe経由の送信が制限され、届かないことがあるようだった。fetch + no-cors の方が
-  // シンプルでこうした制約を受けにくいため、こちらに切り替える。
-  // no-corsモードのため成否はレスポンスから読み取れないが、Apps Script側は
-  // e.postData.contents（生のPOST本文）を読む実装に既になっているので、そのまま送れる。
-  let fetchError = null;
-  try {
-    await fetch(url, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: payloadJson,
-    });
-  } catch (err) {
-    fetchError = err;
-    console.error('[BottleKeeper] fetch送信でエラー:', err);
-  }
-  if (fetchError) {
-    throw new Error(`ネットワーク送信に失敗しました：${fetchError.message || fetchError}`);
-  }
-  // サーバー側の処理（分割書き込み等）が完了するまで少し待つ
-  await new Promise((resolve) => setTimeout(resolve, 3000));
+function submitViaHiddenForm(url, payloadJson) {
+  return new Promise((resolve, reject) => {
+    let iframe = document.getElementById('gas-sync-frame');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'gas-sync-frame';
+      iframe.name = 'gas-sync-frame';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+    form.target = 'gas-sync-frame';
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = payloadJson;
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+    // iframeの中身はクロスオリジンのため読み取れない。送信・サーバー側の処理が完了するまで待つ。
+    // データ件数が増えるほど（分割書き込みのため）時間がかかることがあるので、余裕を持って待つ。
+    setTimeout(resolve, 5000);
+  });
 }
 
 async function syncToSpreadsheet(silent = false) {
