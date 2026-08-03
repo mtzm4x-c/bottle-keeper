@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   APP.settings = settings;
 
-  await refreshCache();
+  await refreshCache(false);
 
   if (APP.settings.sheetAutoPullOnStart) {
     if (hasUnsyncedLocalChanges()) {
