@@ -2709,8 +2709,10 @@ function buildSpreadsheetPayload() {
 // fetch + mode:'no-cors' は、Apps Script側でのリダイレクトの都合で
 // POSTの中身が実際には届かないことがある（届いたように見えて実は失敗する）ため、
 // 隠しiframe＋フォーム送信という、リダイレクトに強い方式で送信する
-function submitViaHiddenForm(url, payloadJson) {
-  return new Promise((resolve, reject) => {
+async function submitViaHiddenForm(url, payloadJson) {
+  // 端末によって、隠しiframeでの送信とfetchでの送信のどちらが確実に届くかが異なるようなので、
+  // 両方とも試すことで、どちらか一方が届けばよい状態にする。
+  await new Promise((resolve) => {
     let iframe = document.getElementById('gas-sync-frame');
     if (!iframe) {
       iframe = document.createElement('iframe');
@@ -2731,10 +2733,22 @@ function submitViaHiddenForm(url, payloadJson) {
     document.body.appendChild(form);
     form.submit();
     form.remove();
-    // iframeの中身はクロスオリジンのため読み取れない。送信・サーバー側の処理が完了するまで待つ。
-    // データ件数が増えるほど（分割書き込みのため）時間がかかることがあるので、余裕を持って待つ。
-    setTimeout(resolve, 5000);
+    setTimeout(resolve, 500);
   });
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: payloadJson,
+    });
+  } catch (err) {
+    console.error('[BottleKeeper] fetch送信でエラー（iframe送信は別途試行済み）:', err);
+  }
+
+  // サーバー側の処理（分割書き込み等）が完了するまで待つ
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 }
 
 async function syncToSpreadsheet(silent = false) {
