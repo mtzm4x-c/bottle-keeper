@@ -757,16 +757,19 @@ function openCustomerBottlesModal(customerId) {
   const body = `
     <p class="text-muted">${escapeHtml(customer.kana)}</p>
     ${customer.memo ? `<p class="text-muted">特徴・注意事項：${escapeHtml(customer.memo)}</p>` : ''}
-    <div class="table-wrap" style="margin-top:12px;">
-      <table class="data-table">
+    <div class="table-wrap is-cardable" style="margin-top:12px;">
+      <table class="data-table data-table--fixed">
+        <colgroup>
+          <col style="width:120px"><col style="width:30%"><col style="width:30%"><col style="width:110px">
+        </colgroup>
         <thead><tr><th>ボトルNo.</th><th>ボトル名</th><th>ボトル名（カナ）</th><th>最終来店日</th></tr></thead>
         <tbody>
           ${bottles.map((b) => `
             <tr>
-              <td>${bottleTagHtml(b)}</td>
-              <td>${escapeHtml(b.bottleName)}</td>
-              <td class="text-muted">${escapeHtml(b.bottleNameKana)}</td>
-              <td>${BKUtil.displayDate(b.lastVisitDate)}</td>
+              <td data-label="ボトルNo.">${bottleTagHtml(b)}</td>
+              <td class="text-muted" data-label="ボトル名">${escapeHtml(b.bottleName)}</td>
+              <td class="text-muted" data-label="ボトル名（カナ）">${escapeHtml(b.bottleNameKana)}</td>
+              <td class="date-cell-compact" data-label="最終来店日">${BKUtil.displayDate(b.lastVisitDate)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -837,6 +840,15 @@ async function registerVisit(customerId, visitDate) {
 // 10. 共通：検索バー
 // ==========================================================================
 
+// 最終来店日の絞り込み用（年・月のプルダウン）。開店からある程度の幅を持たせておく。
+function yearMonthOptions() {
+  const nowYear = Number(BKUtil.todayJST().slice(0, 4));
+  const years = [];
+  for (let y = nowYear + 1; y >= nowYear - 5; y--) years.push(y);
+  const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  return { years, months };
+}
+
 function searchBarHtml(options = {}) {
   const f = APP.filters;
   const showType = options.showType !== false;
@@ -860,7 +872,16 @@ function searchBarHtml(options = {}) {
     </div>` : ''}
     <div class="search-bar__field">
       <label>最終来店日</label>
-      <input type="month" id="flt-yearMonth" value="${f.yearMonth}">
+      <div class="flex-row" style="gap:6px;">
+        <select id="flt-year" style="flex:1;">
+          <option value="">年</option>
+          ${yearMonthOptions().years.map((y) => `<option value="${y}" ${f.yearMonth.slice(0,4) === String(y) ? 'selected' : ''}>${y}年</option>`).join('')}
+        </select>
+        <select id="flt-month" style="flex:1;">
+          <option value="">月</option>
+          ${yearMonthOptions().months.map((m) => `<option value="${m}" ${f.yearMonth.slice(5,7) === m ? 'selected' : ''}>${Number(m)}月</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div class="search-bar__field">
       <label>★残し</label>
@@ -896,9 +917,18 @@ function attachSearchBarEvents(root, onChange) {
   bind('#flt-freeword', 'freeword');
   bind('#flt-bottleNo', 'bottleNo');
   bind('#flt-bottleType', 'bottleType');
-  bind('#flt-yearMonth', 'yearMonth');
   bind('#flt-star', 'star');
   bind('#flt-status', 'status');
+  const yearEl = root.querySelector('#flt-year');
+  const monthEl = root.querySelector('#flt-month');
+  const updateYearMonth = () => {
+    const y = yearEl ? yearEl.value : '';
+    const m = monthEl ? monthEl.value : '';
+    APP.filters.yearMonth = (y && m) ? `${y}-${m}` : '';
+    onChange();
+  };
+  if (yearEl) yearEl.addEventListener('change', updateYearMonth);
+  if (monthEl) monthEl.addEventListener('change', updateYearMonth);
   const clearBtn = root.querySelector('#flt-clear');
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
@@ -2538,7 +2568,18 @@ function renderBackupScreen(root) {
     await APP.storage.putSettings(APP.settings);
     showToast('端末情報を保存しました');
   });
-  root.querySelector('#btn-sync-now').addEventListener('click', () => manualSyncNow());
+  root.querySelector('#btn-sync-now').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '送信中…';
+    try {
+      await manualSyncNow();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
   root.querySelector('#btn-pull-now').addEventListener('click', () => {
     const body = hasUnsyncedLocalChanges()
       ? `<div class="warning-box">⚠ この端末にはまだ送信していない変更が残っている可能性があります。先に取得すると、その変更は失われます。</div><p>共有データを取得して、この端末のデータを置き換えます。よろしいですか？</p>`
@@ -2710,8 +2751,6 @@ function buildSpreadsheetPayload() {
 // POSTの中身が実際には届かないことがある（届いたように見えて実は失敗する）ため、
 // 隠しiframe＋フォーム送信という、リダイレクトに強い方式で送信する
 async function submitViaHiddenForm(url, payloadJson) {
-  // 端末によって、隠しiframeでの送信とfetchでの送信のどちらが確実に届くかが異なるようなので、
-  // 両方とも試すことで、どちらか一方が届けばよい状態にする。
   await new Promise((resolve) => {
     let iframe = document.getElementById('gas-sync-frame');
     if (!iframe) {
@@ -2733,22 +2772,10 @@ async function submitViaHiddenForm(url, payloadJson) {
     document.body.appendChild(form);
     form.submit();
     form.remove();
-    setTimeout(resolve, 500);
+    // iframeの中身はクロスオリジンのため読み取れない。送信・サーバー側の処理が完了するまで待つ。
+    // データ件数が増えるほど（分割書き込みのため）時間がかかることがあるので、余裕を持って待つ。
+    setTimeout(resolve, 5000);
   });
-
-  try {
-    await fetch(url, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: payloadJson,
-    });
-  } catch (err) {
-    console.error('[BottleKeeper] fetch送信でエラー（iframe送信は別途試行済み）:', err);
-  }
-
-  // サーバー側の処理（分割書き込み等）が完了するまで待つ
-  await new Promise((resolve) => setTimeout(resolve, 5000));
 }
 
 async function syncToSpreadsheet(silent = false) {
