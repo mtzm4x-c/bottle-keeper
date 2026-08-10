@@ -11,11 +11,50 @@
 
 const BOTTLE_TYPES = [
   '金宮', '角', 'ホワイト', '吉四六', '赤霧島',
-  '茉莉花', 'ジェムソン', '宝', '白州', 'ミズナラ', 'その他',
+  '茉莉花', 'ジェムソン', '宝', '白州', 'ミズナラ', '鍛高譚', 'その他',
 ];
 
 // 「ボトル毎管理」画面のタブで、種類をまたいで全件検索するための特別な値
 const ALL_TYPES_TAB = '__ALL__';
+const OTHER_UNLABELED_TAB = 'その他';
+const OTHER_TAB_PREFIX = 'その他:';
+
+// 「その他」で登録された時に自由入力された銘柄名を、実際のデータから拾い集める。
+// これにより、新しい銘柄が登録されるたびに自動でタブが増える（手動でのタブ登録は不要）。
+function getOtherBrandNames() {
+  const names = new Set();
+  APP.bottles.forEach((b) => {
+    if (b.bottleType === OTHER_UNLABELED_TAB && b.status === 'active' && b.bottleName && b.bottleName.trim()) {
+      names.add(b.bottleName.trim());
+    }
+  });
+  return [...names].sort((a, b) => a.localeCompare(b, 'ja'));
+}
+
+// タブ一覧（固定の種類＋「その他」の中から見つかった銘柄ごとのタブ＋銘柄未入力の「その他」タブ）
+function effectiveTypeTabs() {
+  const fixed = BOTTLE_TYPES.filter((t) => t !== OTHER_UNLABELED_TAB);
+  const otherBrands = getOtherBrandNames().map((name) => ({ key: OTHER_TAB_PREFIX + name, label: name }));
+  return [
+    ...fixed.map((t) => ({ key: t, label: t })),
+    ...otherBrands,
+    { key: OTHER_UNLABELED_TAB, label: 'その他（未分類）' },
+  ];
+}
+
+// 指定したタブに、そのボトルが該当するかどうかを判定する
+function bottleMatchesTab(bottle, tabKey) {
+  if (tabKey === ALL_TYPES_TAB) return true;
+  if (tabKey === OTHER_UNLABELED_TAB) {
+    return bottle.bottleType === OTHER_UNLABELED_TAB && (!bottle.bottleName || !bottle.bottleName.trim());
+  }
+  if (tabKey.startsWith(OTHER_TAB_PREFIX)) {
+    const brand = tabKey.slice(OTHER_TAB_PREFIX.length);
+    return bottle.bottleType === OTHER_UNLABELED_TAB && (bottle.bottleName || '').trim() === brand;
+  }
+  return bottle.bottleType === tabKey;
+}
+
 
 // スプレッドシート連携の既定URL。ここにApps ScriptのURLを設定しておくと、
 // 各端末で個別に設定しなくても、URLを開いた全端末が自動でこのURLから最新データを取得する。
@@ -247,6 +286,7 @@ const BOTTLE_TYPE_COLOR_CLASS = {
   '宝': 'bottle-tag--takara',
   '白州': 'bottle-tag--hakushu',
   'ミズナラ': 'bottle-tag--mizunara',
+  '鍛高譚': 'bottle-tag--tantakatan',
   'その他': 'bottle-tag--other',
 };
 function bottleTagHtml(bottle) {
@@ -991,7 +1031,7 @@ function renderManageBottleScreen(root) {
 
 function renderManageBottleBody(root) {
   const list = APP.bottles
-    .filter((b) => b.status === 'active' && (APP.manageBottleTab === ALL_TYPES_TAB || b.bottleType === APP.manageBottleTab))
+    .filter((b) => b.status === 'active' && bottleMatchesTab(b, APP.manageBottleTab))
     .map((b) => ({ bottle: b, customer: getCustomer(b.customerId) }))
     .filter(({ bottle, customer }) => bottleMatchesFilters(bottle, customer));
 
@@ -1004,9 +1044,9 @@ function renderManageBottleBody(root) {
   body.innerHTML = `
     <div class="tab-bar">
       <div class="tab-bar__item ${APP.manageBottleTab === ALL_TYPES_TAB ? 'is-active' : ''}" data-tab="${ALL_TYPES_TAB}">すべて（${APP.bottles.filter((b) => b.status === 'active').length}）</div>
-      ${BOTTLE_TYPES.map((t) => {
-        const cnt = APP.bottles.filter((b) => b.status === 'active' && b.bottleType === t).length;
-        return `<div class="tab-bar__item ${APP.manageBottleTab === t ? 'is-active' : ''}" data-tab="${t}">${t}（${cnt}）</div>`;
+      ${effectiveTypeTabs().map(({ key, label }) => {
+        const cnt = APP.bottles.filter((b) => b.status === 'active' && bottleMatchesTab(b, key)).length;
+        return `<div class="tab-bar__item ${APP.manageBottleTab === key ? 'is-active' : ''}" data-tab="${escapeHtml(key)}">${escapeHtml(label)}（${cnt}）</div>`;
       }).join('')}
     </div>
     <div class="table-wrap is-cardable ${APP.settings.simpleModeBottle ? 'is-simple' : ''}">
@@ -1673,7 +1713,7 @@ function renderDisposalTargetBody(root) {
     .filter(({ bottle, customer }) => !customer.star && BKUtil.isDisposalTarget(bottle.lastVisitDate, APP.settings.disposalThresholdMonths));
 
   let list = baseTargets
-    .filter(({ bottle }) => APP.disposalTab === ALL_TYPES_TAB || bottle.bottleType === APP.disposalTab)
+    .filter(({ bottle }) => bottleMatchesTab(bottle, APP.disposalTab))
     .filter(({ bottle, customer }) => bottleMatchesFilters(bottle, customer));
 
   const sortDir = APP.sort.disposalTarget?.dir || 'desc';
@@ -1688,9 +1728,9 @@ function renderDisposalTargetBody(root) {
   body.innerHTML = `
     <div class="tab-bar">
       <div class="tab-bar__item ${APP.disposalTab === ALL_TYPES_TAB ? 'is-active' : ''}" data-tab="${ALL_TYPES_TAB}">すべて（${baseTargets.length}）</div>
-      ${BOTTLE_TYPES.map((t) => {
-        const cnt = baseTargets.filter(({ bottle }) => bottle.bottleType === t).length;
-        return `<div class="tab-bar__item ${APP.disposalTab === t ? 'is-active' : ''}" data-tab="${t}">${t}（${cnt}）</div>`;
+      ${effectiveTypeTabs().map(({ key, label }) => {
+        const cnt = baseTargets.filter(({ bottle }) => bottleMatchesTab(bottle, key)).length;
+        return `<div class="tab-bar__item ${APP.disposalTab === key ? 'is-active' : ''}" data-tab="${escapeHtml(key)}">${escapeHtml(label)}（${cnt}）</div>`;
       }).join('')}
     </div>
     <div class="table-wrap is-cardable">
