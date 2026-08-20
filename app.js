@@ -984,12 +984,21 @@ function matchesFreeword(freeword, name, kana, bottleName, bottleNameKana, memo)
   if (!freeword) return true;
   const q = freeword.trim();
   if (!q) return true;
-  const qKana = BKUtil.normalizeKana(q);
+  // 通常の部分一致（漢字や記号を含む文字列向け）
   if (BKUtil.includesPartial(name, q)) return true;
+  if (BKUtil.includesPartial(kana, q)) return true;
   if (BKUtil.includesPartial(bottleName, q)) return true;
+  if (BKUtil.includesPartial(bottleNameKana, q)) return true;
   if (BKUtil.includesPartial(memo, q)) return true;
-  if (qKana && BKUtil.normalizeKana(kana).includes(qKana)) return true;
-  if (qKana && BKUtil.normalizeKana(bottleNameKana).includes(qKana)) return true;
+  // ひらがな・カタカナを区別しない一致。フリガナ欄だけでなく、お客様名やボトル名が
+  // カタカナ（例：「キング」）で直接登録されている場合も拾えるようにする。
+  const qKana = BKUtil.normalizeKana(q);
+  if (qKana) {
+    if (BKUtil.normalizeKana(name).includes(qKana)) return true;
+    if (BKUtil.normalizeKana(kana).includes(qKana)) return true;
+    if (BKUtil.normalizeKana(bottleName).includes(qKana)) return true;
+    if (BKUtil.normalizeKana(bottleNameKana).includes(qKana)) return true;
+  }
   return false;
 }
 
