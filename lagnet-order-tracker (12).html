@@ -1,0 +1,3610 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>LAGNET 獲得管理ツール</title>
+<style>
+  :root{
+    --bg: #14151a;
+    --bg-panel: #1c1e26;
+    --bg-panel-2: #23252f;
+    --border: #33353f;
+    --text: #e8e6e1;
+    --text-dim: #9a9ba3;
+    --accent: #c08b45;
+    --accent-soft: rgba(192,139,69,0.15);
+    --blue: #6b8cae;
+    --blue-soft: rgba(107,140,174,0.15);
+    --danger: #b25d4f;
+    --danger-soft: rgba(178,93,79,0.15);
+    --good: #6e9b7a;
+    --good-soft: rgba(110,155,122,0.15);
+    --radius: 10px;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+
+    /* category colors */
+    --cat-perfume: #9b7ede;      /* 練り香水 → 紫 */
+    --cat-perfume-soft: rgba(155,126,222,0.14);
+    --cat-scrub: #d97ca8;        /* スクラブ → ピンク */
+    --cat-scrub-soft: rgba(217,124,168,0.14);
+    --cat-supplement: #c0524a;   /* サプリ → 赤 */
+    --cat-supplement-soft: rgba(192,82,74,0.14);
+    --cat-headscrub: #5fa876;    /* ヘッドスクラブ → 緑 */
+    --cat-headscrub-soft: rgba(95,168,118,0.14);
+    --cat-xenos: #5b8fc7;        /* ゼノス → 青 */
+    --cat-xenos-soft: rgba(91,143,199,0.14);
+    --cat-other: #8a8d97;        /* その他・広告経由なし → グレー */
+    --cat-other-soft: rgba(138,141,151,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{min-height:100vh;}
+  #app{max-width:1180px;margin:0 auto;padding:24px 20px 80px;}
+
+  header.top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px;}
+  header.top .title-wrap{display:flex;align-items:baseline;gap:8px;}
+  header.top h1{font-size:19px;font-weight:700;letter-spacing:0.02em;margin:0;color:var(--text);}
+  header.top h1 .sub{color:var(--accent);font-weight:600;}
+  header.top .ver{font-size:10.5px;color:var(--text-dim);font-family:var(--mono);border:1px solid var(--border);border-radius:4px;padding:1px 6px;}
+  header.top .meta{font-size:12px;color:var(--text-dim);font-family:var(--mono);}
+
+  nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto;}
+  nav.tabs button{
+    background:none;border:none;color:var(--text-dim);font-family:var(--sans);font-size:13.5px;
+    padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;
+    transition:color .15s, border-color .15s;
+  }
+  nav.tabs button:hover{color:var(--text);}
+  nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+
+  .panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+  .panel h2{font-size:14px;margin:0 0 14px;color:var(--text);font-weight:700;}
+  .panel h2 .n{color:var(--text-dim);font-weight:400;font-size:12px;margin-left:6px;}
+
+  .grid-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;}
+  .kpi{background:var(--bg-panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+  .kpi .label{font-size:11.5px;color:var(--text-dim);margin-bottom:6px;}
+  .kpi .value{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--text);}
+  .kpi .value.accent{color:var(--accent);}
+  .kpi .value.danger{color:var(--danger);}
+  .kpi .value.good{color:var(--good);}
+  .kpi .sub{font-size:11px;color:var(--text-dim);margin-top:4px;font-family:var(--mono);}
+
+  /* dropzone */
+  #dropzone{
+    border:1.5px dashed var(--border);border-radius:var(--radius);
+    padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .15s, background .15s;
+    background:var(--bg-panel-2);
+  }
+  #dropzone.drag{border-color:var(--accent);background:var(--accent-soft);}
+  #demoDropzone.drag{border-color:var(--accent);background:var(--accent-soft);}
+  #dropzone .icon{font-size:28px;margin-bottom:8px;opacity:.8;}
+  #dropzone .main{font-size:14px;color:var(--text);margin-bottom:4px;}
+  #dropzone .hint{font-size:12px;color:var(--text-dim);}
+  #fileInput{display:none;}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.data th, table.data td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;}
+  table.data th{color:var(--text-dim);font-weight:600;font-size:11.5px;text-align:right;}
+  table.data th:first-child, table.data td:first-child{text-align:left;}
+  table.data th:nth-child(2), table.data td:nth-child(2){text-align:left;}
+  table.data tr:hover td{background:var(--bg-panel-2);}
+  table.data td.num, table.data th.num{font-family:var(--mono);}
+  table.data tr.total-row td{font-weight:700;border-top:1.5px solid var(--border);background:var(--bg-panel-2);}
+  table.data tr.total-row-top td{font-weight:700;border-bottom:1.5px solid var(--accent);background:rgba(192,139,69,0.16);color:var(--accent);}
+  .tag{display:inline-block;padding:1px 7px;border-radius:5px;font-size:11px;font-family:var(--mono);}
+  .tag.front{background:var(--blue-soft);color:var(--blue);}
+  .tag.upsell{background:var(--accent-soft);color:var(--accent);}
+  .cell-rate{font-family:var(--mono);}
+  .cell-rate.high-cancel{color:var(--danger);}
+  .cell-rate.high-upsell{color:var(--accent);}
+
+  .table-wrap{overflow-x:auto;}
+
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+  .controls label{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px;}
+  select, input[type=date], input[type=number], input[type=text]{
+    background:var(--bg-panel-2);border:1px solid var(--border);color:var(--text);
+    border-radius:6px;padding:6px 10px;font-size:12.5px;font-family:var(--sans);
+  }
+  select:focus, input:focus{outline:1px solid var(--accent);}
+  button.btn{
+    background:var(--bg-panel-2);border:1px solid var(--border);color:var(--text);
+    border-radius:6px;padding:7px 14px;font-size:12.5px;cursor:pointer;transition:all .15s;
+  }
+  button.btn:hover{border-color:var(--accent);color:var(--accent);}
+  button.btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1408;font-weight:600;}
+  button.btn.primary:hover{opacity:.9;color:#1a1408;}
+  button.btn.danger:hover{border-color:var(--danger);color:var(--danger);}
+  button.btn.small{padding:4px 10px;font-size:11.5px;}
+
+  /* category pill buttons */
+  .cat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+  .cat-btn{
+    border:1px solid var(--border);background:var(--bg-panel-2);color:var(--text-dim);
+    border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .15s;
+    display:flex;align-items:center;gap:6px;
+  }
+  .cat-btn .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .cat-btn:hover{color:var(--text);}
+  .cat-btn.active{color:var(--text);font-weight:600;border-color:currentColor;}
+
+  .cat-tag{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;font-size:11.5px;font-weight:600;}
+  .cat-dot{width:7px;height:7px;border-radius:50%;flex:none;}
+
+  .bars{display:flex;flex-direction:column;gap:6px;}
+  .bar-row{display:grid;grid-template-columns:76px 1fr 60px;gap:10px;align-items:center;font-size:11.5px;}
+  .bar-row .lbl{color:var(--text-dim);font-family:var(--mono);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bar-row.wide-label{grid-template-columns:132px 1fr 56px;}
+  .bar-track{background:var(--bg-panel-2);border-radius:4px;height:16px;position:relative;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:4px;background:var(--accent);transition:width .2s;}
+  .bar-fill.cancel{background:var(--danger);}
+  .bar-fill.upsell{background:var(--blue);}
+  .bar-row .val{font-family:var(--mono);color:var(--text-dim);}
+
+  .history-list{display:flex;flex-direction:column;gap:6px;}
+  .history-item{display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);}
+  .history-item .fname{color:var(--text);}
+  .empty-note{color:var(--text-dim);font-size:12.5px;padding:24px;text-align:center;}
+
+  .note-box{font-size:11.5px;color:var(--text-dim);background:var(--bg-panel-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;line-height:1.7;}
+  .note-box strong{color:var(--text);}
+
+  .inline-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+
+  footer.note{margin-top:24px;font-size:11px;color:var(--text-dim);line-height:1.7;}
+  footer.note code{font-family:var(--mono);background:var(--bg-panel-2);padding:1px 5px;border-radius:4px;}
+
+  /* ---------- mobile optimization (iPhone / Android / narrow Mac windows) ---------- */
+  @media (max-width: 640px){
+    #app{padding:16px 12px 60px;}
+
+    header.top{gap:6px;}
+    header.top h1{font-size:16px;}
+    header.top > div{width:100%;}
+    header.top > div[style*="text-align:right"]{text-align:left !important;}
+    #lastUpdatesMeta{white-space:normal;line-height:1.6;}
+
+    /* iOS Safari zooms the page on focus if a form control's font-size is under 16px;
+       force 16px on all interactive form elements while keeping the visual scale via
+       padding/line-height so it doesn't look oversized. */
+    select, input[type=date], input[type=number], input[type=text], textarea{
+      font-size:16px;
+      padding:10px 12px;
+    }
+
+    /* larger, easier-to-tap targets (Apple/Google both recommend ~44px minimum) */
+    button.btn, .cat-btn, nav.tabs button{
+      min-height:44px;
+      padding:10px 16px;
+      font-size:14px;
+    }
+    button.btn.small{ min-height:36px; padding:8px 12px; }
+
+    nav.tabs{gap:2px;}
+    nav.tabs button{padding:10px 14px;font-size:13px;}
+
+    .grid-kpi{grid-template-columns:1fr 1fr;gap:8px;}
+    .kpi{padding:12px;}
+    .kpi .value{font-size:20px;}
+
+    .controls{gap:8px;}
+    .controls label{width:100%;justify-content:space-between;}
+    .inline-form{gap:8px;}
+    .inline-form label{width:100%;}
+
+    table.data{font-size:12px;}
+    table.data th, table.data td{padding:8px 6px;}
+
+    .cat-tabs{gap:4px;}
+    .cat-btn{padding:8px 12px;font-size:12px;}
+
+    .bar-row{grid-template-columns:60px 1fr 46px;gap:6px;font-size:11px;}
+    .bar-row.wide-label{grid-template-columns:96px 1fr 42px;}
+
+    #dropzone{padding:24px 14px;}
+
+    /* respect the iPhone home-indicator / notch safe area */
+    body{padding-bottom: env(safe-area-inset-bottom, 0);}
+  }
+
+  @media (max-width: 400px){
+    .grid-kpi{grid-template-columns:1fr;}
+    .pie-chart-wrap{flex-direction:column;align-items:center;}
+  }
+
+  /* ---------- pie chart (CSS conic-gradient based, no external library) ---------- */
+  .pie-chart-wrap{display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+  .pie-chart{width:180px;height:180px;border-radius:50%;flex:none;}
+  .pie-legend{display:flex;flex-direction:column;gap:6px;flex:1;min-width:180px;}
+  .pie-legend-item{display:flex;align-items:center;gap:8px;font-size:12.5px;}
+  .pie-legend-swatch{width:12px;height:12px;border-radius:3px;flex:none;}
+  .pie-legend-label{flex:1;color:var(--text);}
+  .pie-legend-value{font-family:var(--mono);color:var(--text-dim);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="top">
+    <div class="title-wrap">
+      <h1>LAGNET <span class="sub">獲得管理ツール</span></h1>
+      <span class="ver" id="verLabel"></span>
+    </div>
+    <div style="text-align:right;">
+      <div class="meta" id="dataMeta">データ 0件</div>
+      <div class="meta" id="lastUpdatesMeta" style="margin-top:2px;font-size:11px;"></div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="dashboard" class="active">📊 ダッシュボード</button>
+    <button data-tab="summary">📋 商材×代理店 集計</button>
+    <button data-tab="trend">📈 推移</button>
+    <button data-tab="report">📝 報告</button>
+    <button data-tab="demographics">👥 デモグラ</button>
+    <button data-tab="media">📡 媒体別</button>
+    <button data-tab="ltv">💹 収益シミュレーション</button>
+    <button data-tab="cost">💰 広告費設定</button>
+    <button data-tab="manage">📁 データ管理</button>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <section id="tab-dashboard">
+    <div class="cat-tabs" id="dashPeriodTabs"></div>
+    <div class="controls" id="dashCustomRangeControls" style="display:none;">
+      <label>開始日 <input type="date" id="dashCustomFrom"></label>
+      <label>終了日 <input type="date" id="dashCustomTo"></label>
+    </div>
+
+    <div class="cat-tabs" id="dashCatTabs"></div>
+
+    <div class="grid-kpi" id="dashKpis"></div>
+
+    <div class="panel">
+      <h2>今月の着地想定<span class="n">（当月の平均 × 残り日数で算出）</span></h2>
+      <div class="grid-kpi" id="dashLandingKpis"></div>
+    </div>
+
+    <div class="panel">
+      <h2>広告URLグループ別 着地シミュレーション<span class="n">（件数を入力すると成果単価/CPAで自動計算）</span></h2>
+      <div id="landingSimAlert"></div>
+      <div class="table-wrap"><table class="data" id="landingSimTable"></table></div>
+      <div class="controls" style="margin-top:10px;">
+        <button class="btn" id="landingSimAddRowBtn">＋ 行を追加</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>商材別 獲得件数<span class="n">（選択期間内・全商材）</span></h2>
+      <div class="table-wrap"><table class="data" id="dashCategoryTable"></table></div>
+    </div>
+
+    <div class="panel">
+      <h2>日次獲得件数（直近14日）</h2>
+      <div class="bars" id="dashBars"></div>
+    </div>
+    <div class="panel">
+      <h2>代理店別 獲得件数 TOP</h2>
+      <div class="bars" id="dashAgencyBars"></div>
+    </div>
+    <div class="panel">
+      <h2>媒体別件数<span class="n">（購入URLの7〜9文字目から判定）</span></h2>
+      <div class="bars" id="dashMediaBars"></div>
+    </div>
+  </section>
+
+  <!-- SUMMARY -->
+  <section id="tab-summary" style="display:none;">
+    <div class="cat-tabs" id="sumPeriodTabs"></div>
+    <div class="controls" id="sumCustomRangeControls" style="display:none;">
+      <label>開始日 <input type="date" id="sumFrom"></label>
+      <label>終了日 <input type="date" id="sumTo"></label>
+    </div>
+    <div class="controls">
+      <label>並び順
+        <select id="sumSort">
+          <option value="count_desc">件数が多い順</option>
+          <option value="count_asc">件数が少ない順</option>
+          <option value="cost_desc">概算費用が高い順</option>
+          <option value="cancel_desc">キャンセル率が高い順</option>
+          <option value="upsell_desc">アップセル率が高い順</option>
+        </select>
+      </label>
+    </div>
+    <div class="cat-tabs" id="sumCatTabs"></div>
+    <div class="panel">
+      <h2>商材 × 代理店 別 獲得件数<span class="n" id="sumRangeLabel"></span></h2>
+      <div class="table-wrap">
+        <table class="data" id="sumTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- TREND -->
+  <section id="tab-trend" style="display:none;">
+    <div class="cat-tabs" id="trendPeriodTabs"></div>
+    <div class="controls" id="trendCustomRangeControls" style="display:none;">
+      <label>開始日 <input type="date" id="trendCustomFrom"></label>
+      <label>終了日 <input type="date" id="trendCustomTo"></label>
+    </div>
+    <div class="controls">
+      <label>粒度
+        <select id="trendGranularity">
+          <option value="date">日次</option>
+          <option value="month">月次</option>
+        </select>
+      </label>
+      <label>代理店
+        <select id="trendAgency"><option value="">すべて</option></select>
+      </label>
+    </div>
+    <div class="cat-tabs" id="trendCatTabs"></div>
+    <div class="panel">
+      <h2>獲得件数・キャンセル・アップセルの推移</h2>
+      <div class="table-wrap"><table class="data" id="trendTable"></table></div>
+    </div>
+  </section>
+
+  <!-- REPORT -->
+  <section id="tab-report" style="display:none;">
+    <div class="cat-tabs" id="reportPeriodTabs"></div>
+    <div class="controls" id="reportCustomRangeControls" style="display:none;">
+      <label>開始日 <input type="date" id="reportCustomFrom"></label>
+      <label>終了日 <input type="date" id="reportCustomTo"></label>
+    </div>
+    <div class="panel">
+      <h2>商材別 報告テキスト<span class="n" id="reportRangeLabel"></span></h2>
+      <div class="controls">
+        <button class="btn primary" id="reportCopyBtn">📋 コピー</button>
+        <span class="n" id="reportCopyStatus"></span>
+      </div>
+      <textarea id="reportTextArea" readonly rows="16" style="width:100%;background:var(--bg-panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:12px;font-family:var(--mono);font-size:13px;resize:vertical;line-height:1.7;"></textarea>
+    </div>
+  </section>
+
+  <!-- DEMOGRAPHICS -->
+  <section id="tab-demographics" style="display:none;">
+    <div class="panel">
+      <h2>デモグラCSVアップロード<span class="n">（性別・生年月日・都道府県）</span></h2>
+      <div class="note-box">
+        注文データとは別に扱います。列に「性別」「生年月日」「都道府県」を含むCSVをアップロードしてください。<strong>アップロードするたびに、前回分は全て新しいデータに入れ替わります</strong>（一意のIDがない性質のデータのため、蓄積ではなく毎回まるごと置き換える仕様です）。
+      </div>
+      <div id="demoDropzone" style="border:1.5px dashed var(--border);border-radius:var(--radius);padding:28px 20px;text-align:center;cursor:pointer;background:var(--bg-panel-2);">
+        <div style="font-size:24px;margin-bottom:6px;opacity:.8;">📤</div>
+        <div style="font-size:14px;margin-bottom:4px;">デモグラCSVをドラッグ&ドロップ、またはクリックして選択</div>
+        <div style="font-size:12px;color:var(--text-dim);">Shift-JIS / UTF-8 自動判定</div>
+        <input type="file" id="demoFileInput" accept=".csv" style="display:none;">
+      </div>
+      <div id="demoUploadResult"></div>
+      <div class="controls" style="margin-top:10px;">
+        <span class="n" id="demoDataMeta">データなし</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>年代別</h2>
+      <div id="demoAgeChart"></div>
+    </div>
+    <div class="panel">
+      <h2>性別</h2>
+      <div id="demoGenderChart"></div>
+    </div>
+    <div class="panel">
+      <h2>都道府県別<span class="n">（上位10件＋その他）</span></h2>
+      <div id="demoPrefChart"></div>
+    </div>
+  </section>
+
+  <!-- MEDIA (媒体別) -->
+  <section id="tab-media" style="display:none;">
+    <div class="controls">
+      <label>代理店
+        <select id="mediaFilterAgency"><option value="">すべて</option></select>
+      </label>
+    </div>
+    <div class="cat-tabs" id="mediaFilterCatTabs"></div>
+    <div class="panel">
+      <h2>月別 媒体件数<span class="n">（購入URLの7〜9文字目から判定・全期間）</span></h2>
+      <div class="table-wrap"><table class="data" id="mediaMonthTable"></table></div>
+    </div>
+
+    <div class="panel">
+      <h2>対象月の内訳</h2>
+      <div class="cat-tabs" id="mediaMonthSelectTabs"></div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;">
+        <div style="flex:1;min-width:260px;">
+          <h3 style="font-size:12.5px;color:var(--text-dim);margin:0 0 10px;">棒グラフ</h3>
+          <div class="bars" id="mediaMonthBars"></div>
+        </div>
+        <div style="flex:1;min-width:260px;">
+          <h3 style="font-size:12.5px;color:var(--text-dim);margin:0 0 10px;">円グラフ</h3>
+          <div id="mediaMonthPie"></div>
+        </div>
+      </div>
+      <div class="controls" style="margin-top:16px;">
+        <button class="btn primary" id="mediaReportCopyBtn">📋 テキストをコピー</button>
+        <span class="n" id="mediaReportCopyStatus"></span>
+      </div>
+      <textarea id="mediaReportTextArea" readonly rows="10" style="width:100%;background:var(--bg-panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:12px;font-family:var(--mono);font-size:13px;resize:vertical;line-height:1.7;"></textarea>
+    </div>
+  </section>
+
+  <!-- LTV / 収益シミュレーション -->
+  <section id="tab-ltv" style="display:none;">
+    <div class="note-box">
+      継続率（残存率）は商材ごとに手入力で維持します（ecforceの定期継続率レポート等を見ながら更新してください）。回数2〜13は個別、14回目以降は一括の継続率を設定します。<br>
+      「進捗」＝今日時点のこの商材の実績件数、「着地想定」＝ダッシュボードの着地件数（フロント/アップセル別）と連動した数字です。
+    </div>
+    <div class="cat-tabs" id="ltvCatTabs"></div>
+    <div class="controls" style="margin-bottom:4px;">
+      <label style="font-size:12px;color:var(--text-dim);">オファー（初回価格帯）で絞り込み</label>
+    </div>
+    <div class="cat-tabs" id="ltvOfferTabs"></div>
+
+    <div class="panel">
+      <h2>2年間シミュレーション結果</h2>
+      <div class="compare-grid">
+        <div class="period-box">
+          <h3>進捗（今日時点の実績）</h3>
+          <div class="grid-kpi" id="ltvProgressKpis"></div>
+        </div>
+        <div class="period-box">
+          <h3>着地想定（ダッシュボード連動）</h3>
+          <div class="grid-kpi" id="ltvLandingKpis"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>2年間シミュレーション<span class="n">（表示するシナリオを選択）</span></h2>
+      <div class="cat-tabs" id="ltvScenarioTabs"></div>
+      <div class="table-wrap"><table class="data" id="ltvCycleTable"></table></div>
+    </div>
+
+    <div class="panel">
+      <h2>設定（商材: <span id="ltvSettingsCategoryLabel"></span>）</h2>
+      <h3 style="font-size:12.5px;color:var(--text-dim);margin:0 0 10px;">お届け頻度</h3>
+      <div id="ltvIntervalSettings"></div>
+
+      <h3 style="font-size:12.5px;color:var(--text-dim);margin:20px 0 10px;">単価・原価（円）</h3>
+      <div class="table-wrap"><table class="data" id="ltvPriceCogsTable"></table></div>
+
+      <h3 style="font-size:12.5px;color:var(--text-dim);margin:20px 0 10px;">継続率（%）</h3>
+      <div class="table-wrap"><table class="data" id="ltvRetentionTable"></table></div>
+      <div id="ltvRetentionPasteArea"></div>
+    </div>
+
+    <div class="panel">
+      <h2>全体設定<span class="n">（全商材共通）</span></h2>
+      <div class="controls">
+        <label>決済手数料率(%) <input type="number" id="ltvPaymentFeeRate" step="0.1" style="width:80px;"></label>
+        <label>ロス率(%) <input type="number" id="ltvLossRate" step="0.1" style="width:80px;"></label>
+      </div>
+      <h3 style="font-size:12.5px;color:var(--text-dim);margin:14px 0 8px;">その他固定費目<span style="font-weight:400;">（単価 × 総件数で計算）</span></h3>
+      <div class="table-wrap"><table class="data" id="ltvFixedCostTable"></table></div>
+      <div class="controls" style="margin-top:8px;">
+        <button class="btn" id="ltvFixedCostAddBtn">＋ 項目を追加</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- COST SETTINGS -->
+  <section id="tab-cost" style="display:none;">
+    <div class="note-box">
+      <strong>種別の自動判定について：</strong> 広告URLグループ名に「(運用)」を含む場合は<strong>予算運用</strong>、代理店名が「自社」「登録用仮」の場合も<strong>予算運用</strong>、それ以外（ASP・アフィリエイト各社名）は<strong>アフィリエイト</strong>としています。実態と異なる場合は下の表で種別を変更してください。<br>
+      <strong>概算費用の計算：</strong> アフィリエイト＝成果単価 × 獲得件数（フロント＋アップセル）／ 予算運用＝下で入力・スプレッドシート連携（データ管理タブ）した日別広告費の合計
+    </div>
+
+    <div class="controls">
+      <label style="font-weight:600;color:var(--text);">予算運用の平均CPA 集計期間</label>
+    </div>
+    <div class="cat-tabs" id="cpaPeriodTabs"></div>
+
+    <div class="panel">
+      <h2>広告URLグループ別 設定<span class="n" id="groupSettingsCount"></span></h2>
+      <div class="table-wrap"><table class="data" id="groupSettingsTable"></table></div>
+    </div>
+
+    <div class="panel">
+      <h2>予算運用：日別広告費の手入力</h2>
+      <div class="inline-form">
+        <label>日付 <input type="date" id="budgetDate"></label>
+        <label>対象グループ
+          <select id="budgetGroup"></select>
+        </label>
+        <label>金額（円） <input type="number" id="budgetAmount" min="0" step="1" placeholder="例: 15000" style="width:110px;"></label>
+        <button class="btn primary" id="budgetAddBtn">追加</button>
+      </div>
+      <h3 style="font-size:12.5px;color:var(--text-dim);margin:16px 0 8px;">グループ別 小計<span style="font-weight:400;">（重複が無いか確認用）</span></h3>
+      <div class="table-wrap"><table class="data" id="budgetSubtotalTable"></table></div>
+      <h3 style="font-size:12.5px;color:var(--text-dim);margin:16px 0 8px;">日別 一覧<span style="font-weight:400;color:var(--text-dim);"> — グループで絞り込めます</span></h3>
+      <div class="controls">
+        <label>グループで絞り込み
+          <select id="budgetFilterGroup"><option value="">すべて</option></select>
+        </label>
+        <button class="btn danger" id="budgetDeleteGroupBtn" style="display:none;">このグループのデータを全削除</button>
+      </div>
+      <div class="table-wrap"><table class="data" id="budgetTable"></table></div>
+    </div>
+  </section>
+
+  <!-- MANAGE -->
+  <section id="tab-manage" style="display:none;">
+    <div class="panel">
+      <h2>共有設定<span class="n">（全データをスプレッドシート経由でチーム共有）</span></h2>
+      <div class="note-box">
+        <strong>このツールには共有バックエンドURLが最初から設定されています。</strong>受注データ・広告費設定・媒体コード・履歴など<strong>全データ</strong>が共有スプレッドシートに保存され、このファイルを開いた人は誰でも同じ内容を見られます。<br>
+        別の共有先に変えたい場合はURLを書き換えて保存してください。共有をやめてこの端末だけのデータに戻したい場合は、欄を空にして保存してください。<br>
+        オフライン中もこの端末に保存された直前のデータが表示され、オンラインに戻ったタイミング・タブを開いたタイミングで自動的に同期されます。
+      </div>
+      <div class="inline-form">
+        <label>共有バックエンドURL <input type="text" id="syncUrlInput" style="width:380px;" placeholder="https://script.google.com/macros/s/.../exec"></label>
+        <button class="btn primary" id="syncSaveBtn">保存して同期</button>
+        <span class="n" id="syncStatusLabel"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>スプレッドシート連携（予算運用の日別広告費を取込み）</h2>
+      <div class="note-box">
+        <strong>方法1: URLを読み込む</strong>（Googleスプレッドシートの「ウェブに公開」CSV URL、または Apps Script のWebアプリURLに対応。後者はCORS制限を受けにくく毎回自動取得できるためおすすめです）。<br>
+        <strong>方法2: 直接貼り付け</strong>（スプレッドシート上で範囲を選択してコピーし、下の欄に貼り付け）。URL読み込みがブラウザの制限（CORS）で失敗する場合はこちらを使ってください。<br>
+        どちらも1行目は見出し行、いずれかの列に日付、他の列に代理店・グループごとの日別広告費が入っている想定です。読み込み後、列とグループの対応を指定して取込を実行します。
+      </div>
+      <div class="inline-form">
+        <label>データ取得URL <input type="text" id="sheetUrl" style="width:380px;" placeholder="https://script.google.com/macros/s/.../exec"></label>
+        <button class="btn" id="sheetFetchBtn">URLから読み込む</button>
+        <span class="n" id="sheetLastSync"></span>
+      </div>
+      <div class="controls" style="margin-top:8px;">
+        <label style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="sheetTwoHeaderRows">
+          見出しが2行ある（1行目：商材名など、2行目：代理店名などを結合して列名にする）
+        </label>
+      </div>
+      <div class="controls" style="margin-top:4px;">
+        <label style="width:100%;">または、スプレッドシートの範囲をコピーしてここに貼り付け</label>
+      </div>
+      <textarea id="sheetPasteArea" rows="5" style="width:100%;background:var(--bg-panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:10px;font-family:var(--mono);font-size:12px;resize:vertical;" placeholder="日付	アドバリュー予算	バレットグループ予算
+2026/08/01	5000	3000
+2026/08/02	5200	3100"></textarea>
+      <div class="controls" style="margin-top:8px;">
+        <button class="btn" id="sheetParseBtn">貼り付けたデータを解析</button>
+      </div>
+      <div id="sheetMappingArea"></div>
+      <div id="sheetImportResult"></div>
+    </div>
+    <div class="panel">
+      <h2>CSVアップロード（ecforce 新規受注一覧）</h2>
+      <div id="dropzone">
+        <div class="icon">📤</div>
+        <div class="main">CSVファイルをドラッグ&ドロップ、またはクリックして選択</div>
+        <div class="hint">Shift-JIS / UTF-8 自動判定・同一注文行は自動で更新（重複追加なし）</div>
+        <input type="file" id="fileInput" accept=".csv">
+      </div>
+      <div id="uploadResult"></div>
+    </div>
+    <div class="panel">
+      <h2>アップロード履歴<span class="n" id="histCount"></span></h2>
+      <div class="history-list" id="historyList"><div class="empty-note">まだアップロード履歴はありません</div></div>
+    </div>
+    <div class="panel">
+      <h2>媒体コード設定<span class="n">（購入URLの7〜9文字目から媒体を自動判定）</span></h2>
+      <div class="note-box">
+        購入URL文字列の7〜9文字目（3文字）を媒体コードとして判定し、ダッシュボードの「媒体別件数」に反映します。新しい媒体を追加する場合はここに登録してください。
+      </div>
+      <div class="inline-form">
+        <label>コード（3文字） <input type="text" id="mediaCodeInput" maxlength="3" style="width:70px;text-transform:lowercase;" placeholder="例: fbk"></label>
+        <label>媒体名 <input type="text" id="mediaLabelInput" style="width:160px;" placeholder="例: Meta"></label>
+        <button class="btn primary" id="mediaAddBtn">追加</button>
+      </div>
+      <div class="table-wrap"><table class="data" id="mediaMapTable"></table></div>
+      <h2 style="margin-top:22px;">未分類のコード<span class="n" id="unclassifiedCount"></span></h2>
+      <div class="table-wrap"><table class="data" id="unclassifiedMediaTable"></table></div>
+      <h2 style="margin-top:22px;">変更履歴<span class="n" id="mediaHistoryCount"></span></h2>
+      <div class="table-wrap"><table class="data" id="mediaHistoryTable"></table></div>
+    </div>
+    <div class="panel">
+      <h2>データ管理</h2>
+      <div class="controls">
+        <span style="font-size:12.5px;color:var(--text-dim);" id="totalRecordsLabel">合計 0 件のレコードを保存中</span>
+        <button class="btn danger" id="clearAllBtn">全データ削除</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="note">
+    データはこの端末のブラウザ内（localStorage）にのみ保存されます。他の端末とは共有されません。<br>
+    商材判定: 広告URLグループ名の<code>【】</code>内カテゴリ／代理店判定: 広告主名列／フロント・アップセル判定: 商品コードに <code>upsell</code> を含むか
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const APP_VERSION = "3.3.0";
+
+  const STORAGE_KEY = 'lagnet_order_records_v1';
+  const HISTORY_KEY = 'lagnet_upload_history_v1';
+  const GROUP_SETTINGS_KEY = 'lagnet_group_settings_v1';
+  const DAILY_BUDGET_KEY = 'lagnet_daily_budget_v1';
+  const BUDGET_LAST_UPDATED_KEY = 'lagnet_budget_last_updated_v1';
+  const SHEET_CONFIG_KEY = 'lagnet_sheet_config_v1';
+  const MEDIA_MAP_KEY = 'lagnet_media_map_v1';
+  const MEDIA_MAP_HISTORY_KEY = 'lagnet_media_map_history_v1';
+  const DEMOGRAPHICS_KEY = 'lagnet_demographics_v1';
+  const DEMOGRAPHICS_META_KEY = 'lagnet_demographics_meta_v1';
+  const LTV_SETTINGS_KEY = 'lagnet_ltv_settings_v1';
+  const LTV_GLOBAL_KEY = 'lagnet_ltv_global_v1';
+  const SYNC_URL_KEY = 'lagnet_sync_url_v1';
+  // デフォルトの共有バックエンドURL。この端末で明示的に設定を変更（空欄保存を含む）
+  // していない限り、初回から自動でこの共有スプレッドシートに接続します。
+  const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbyVWG6qD3WV9FIQ89nlzI9hfEdPuBf54kOQXP544f-mELV8vVhdLeyLlKkjnJLniwO6/exec';
+  const SYNC_LAST_KEY = 'lagnet_sync_last_v1';
+
+  const DEFAULT_MEDIA_MAP = {
+    'fbk': 'Meta',
+    'yda': 'YDA',
+    'gdn': 'GDN',
+    'tik': 'TikTok',
+    'yts': 'YouTube',
+    'you': 'YouTube',
+    'smn': 'SmartNews',
+    'lin': 'LINE',
+    'lgc': 'Logicad',
+    'cpx': 'cpx',
+    'cir': 'サークア',
+    'inf': 'インフルエンサー',
+    'uqs': 'UNIQUEST'
+  };
+
+  const CATEGORY_COLOR_MAP = {
+    '練り香水': 'perfume',
+    'スクラブ': 'scrub',
+    'サプリ': 'supplement',
+    'ヘッドスクラブ': 'headscrub',
+    'ゼノス': 'xenos'
+  };
+  function categoryColorKey(cat){ return CATEGORY_COLOR_MAP[cat] || 'other'; }
+  function categoryColorVar(cat){ return `var(--cat-${categoryColorKey(cat)})`; }
+  function categoryColorSoftVar(cat){ return `var(--cat-${categoryColorKey(cat)}-soft)`; }
+  function categoryTag(cat){
+    return `<span class="cat-tag" style="background:${categoryColorSoftVar(cat)};color:${categoryColorVar(cat)};"><span class="cat-dot" style="background:${categoryColorVar(cat)};"></span>${escapeHtml(cat)}</span>`;
+  }
+
+  // ---------- storage ----------
+  function loadRecords(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ return []; }
+  }
+  function saveRecords(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); pushKey('records'); }
+  function loadHistory(){
+    try{ return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }catch(e){ return []; }
+  }
+  function saveHistory(arr){ localStorage.setItem(HISTORY_KEY, JSON.stringify(arr)); pushKey('history'); }
+  function loadGroupSettings(){
+    try{ return JSON.parse(localStorage.getItem(GROUP_SETTINGS_KEY) || '{}'); }catch(e){ return {}; }
+  }
+  function saveGroupSettings(obj){ localStorage.setItem(GROUP_SETTINGS_KEY, JSON.stringify(obj)); pushKey('groupSettings'); }
+  function loadDailyBudget(){
+    try{ return JSON.parse(localStorage.getItem(DAILY_BUDGET_KEY) || '[]'); }catch(e){ return []; }
+  }
+  function saveDailyBudget(arr){
+    localStorage.setItem(DAILY_BUDGET_KEY, JSON.stringify(arr));
+    localStorage.setItem(BUDGET_LAST_UPDATED_KEY, new Date().toISOString());
+    pushKey('dailyBudget');
+  }
+  function loadMediaMap(){
+    try{
+      const stored = JSON.parse(localStorage.getItem(MEDIA_MAP_KEY) || 'null');
+      return stored || Object.assign({}, DEFAULT_MEDIA_MAP);
+    }catch(e){ return Object.assign({}, DEFAULT_MEDIA_MAP); }
+  }
+  function saveMediaMap(obj){ localStorage.setItem(MEDIA_MAP_KEY, JSON.stringify(obj)); pushKey('mediaMap'); }
+
+  function loadMediaMapHistory(){
+    try{ return JSON.parse(localStorage.getItem(MEDIA_MAP_HISTORY_KEY) || '[]'); }catch(e){ return []; }
+  }
+  function saveMediaMapHistory(arr){
+    localStorage.setItem(MEDIA_MAP_HISTORY_KEY, JSON.stringify(arr.slice(0, 50)));
+    pushKey('mediaMapHistory');
+  }
+  function loadDemographics(){
+    try{ return JSON.parse(localStorage.getItem(DEMOGRAPHICS_KEY) || '[]'); }catch(e){ return []; }
+  }
+  function saveDemographics(arr){
+    localStorage.setItem(DEMOGRAPHICS_KEY, JSON.stringify(arr));
+    pushKey('demographics');
+  }
+  function loadDemographicsMeta(){
+    try{ return JSON.parse(localStorage.getItem(DEMOGRAPHICS_META_KEY) || 'null'); }catch(e){ return null; }
+  }
+  function saveDemographicsMeta(meta){
+    localStorage.setItem(DEMOGRAPHICS_META_KEY, JSON.stringify(meta));
+    pushKey('demographicsMeta');
+  }
+  function pushMediaMapHistory(entry){
+    const hist = loadMediaMapHistory();
+    hist.unshift(Object.assign({
+      id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      timestamp: new Date().toISOString(),
+      undone: false
+    }, entry));
+    saveMediaMapHistory(hist);
+  }
+  // entry shape: { prevCode, prevLabel, newCode, newLabel } — either prev* or new* may be null (add / delete)
+  function describeMediaChange(e){
+    if (!e.prevCode && e.newCode) return `追加: ${e.newCode} → ${e.newLabel}`;
+    if (e.prevCode && !e.newCode) return `削除: ${e.prevCode} (${e.prevLabel})`;
+    if (e.prevCode === e.newCode) return `編集: ${e.newCode}「${e.prevLabel} → ${e.newLabel}」`;
+    return `コード変更: ${e.prevCode} → ${e.newCode}（${e.newLabel}）`;
+  }
+  function undoMediaMapChange(id){
+    const hist = loadMediaMapHistory();
+    const entry = hist.find(h => h.id === id);
+    if (!entry || entry.undone) return;
+    const map = loadMediaMap();
+    if (entry.newCode) delete map[entry.newCode];
+    if (entry.prevCode) map[entry.prevCode] = entry.prevLabel;
+    saveMediaMap(map);
+    entry.undone = true;
+    saveMediaMapHistory(hist);
+  }
+  function extractMediaCode(purchaseUrl){
+    if (!purchaseUrl || purchaseUrl.length < 9) return '';
+    return purchaseUrl.slice(6, 9).toLowerCase();
+  }
+  function mediaLabelFor(purchaseUrl){
+    const code = extractMediaCode(purchaseUrl);
+    if (!code) return null;
+    const map = loadMediaMap();
+    return map[code] || null;
+  }
+  function loadSheetConfig(){
+    try{ return Object.assign({ url:'', dateColumnIndex:null, mappings:{}, lastImportedAt:null, twoHeaderRows:false }, JSON.parse(localStorage.getItem(SHEET_CONFIG_KEY) || '{}')); }
+    catch(e){ return { url:'', dateColumnIndex:null, mappings:{}, lastImportedAt:null, twoHeaderRows:false }; }
+  }
+  function saveSheetConfig(cfg){ localStorage.setItem(SHEET_CONFIG_KEY, JSON.stringify(cfg)); }
+
+  // ---------- shared sync (Google Sheet backend via Apps Script) ----------
+  function loadSyncUrl(){
+    const stored = localStorage.getItem(SYNC_URL_KEY);
+    return stored !== null ? stored : DEFAULT_SYNC_URL;
+  }
+  function saveSyncUrl(url){ localStorage.setItem(SYNC_URL_KEY, url); }
+  function loadSyncLast(){ return localStorage.getItem(SYNC_LAST_KEY) || null; }
+
+  let syncStatus = 'idle'; // 'idle' | 'syncing' | 'ok' | 'error'
+  let syncErrorMessage = '';
+  let syncInFlight = false;
+
+  const SYNC_KEY_TO_STORAGE_KEY = {
+    records: STORAGE_KEY,
+    history: HISTORY_KEY,
+    groupSettings: GROUP_SETTINGS_KEY,
+    dailyBudget: DAILY_BUDGET_KEY,
+    mediaMap: MEDIA_MAP_KEY,
+    mediaMapHistory: MEDIA_MAP_HISTORY_KEY,
+    demographics: DEMOGRAPHICS_KEY,
+    demographicsMeta: DEMOGRAPHICS_META_KEY,
+    ltvSettings: LTV_SETTINGS_KEY,
+    ltvGlobal: LTV_GLOBAL_KEY
+  };
+  const SYNC_KEYS = Object.keys(SYNC_KEY_TO_STORAGE_KEY);
+
+  // Merge strategy per data type. Arrays with a unique `id` are merged by upsert
+  // (local wins per-id since it reflects the most recent edit on this device);
+  // plain objects (keyed maps) are shallow-merged the same way.
+  function mergeForKey(key, serverVal, localVal){
+    if (serverVal == null) return localVal;
+    if (localVal == null) return serverVal;
+    switch(key){
+      case 'records':
+      case 'dailyBudget': {
+        const map = {};
+        (serverVal||[]).forEach(x=>{ if (x && x.id) map[x.id]=x; });
+        (localVal||[]).forEach(x=>{ if (x && x.id) map[x.id]=x; });
+        return Object.values(map);
+      }
+      case 'mediaMapHistory': {
+        const map = {};
+        (serverVal||[]).forEach(x=>{ if (x && x.id) map[x.id]=x; });
+        (localVal||[]).forEach(x=>{
+          if (!x || !x.id) return;
+          const existing = map[x.id];
+          // once undone, stay undone regardless of which side is "newer"
+          if (existing && existing.undone && !x.undone) return;
+          map[x.id]=x;
+        });
+        return Object.values(map).sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)).slice(0,50);
+      }
+      case 'history': {
+        const keyOf = h => (h.uploadedAt||'') + '|' + (h.filename||'');
+        const map = {};
+        (serverVal||[]).forEach(x=>{ map[keyOf(x)]=x; });
+        (localVal||[]).forEach(x=>{ map[keyOf(x)]=x; });
+        return Object.values(map).sort((a,b)=> new Date(b.uploadedAt)-new Date(a.uploadedAt)).slice(0,50);
+      }
+      case 'groupSettings':
+      case 'mediaMap':
+      case 'ltvSettings':
+      case 'ltvGlobal':
+        return Object.assign({}, serverVal||{}, localVal||{});
+      default:
+        return localVal;
+    }
+  }
+
+  function setSyncStatus(status, message){
+    syncStatus = status;
+    syncErrorMessage = message || '';
+    renderSyncStatusLabel();
+  }
+
+  // Google Apps Script Web Apps route through a redirect chain (script.google.com ->
+  // script.googleusercontent.com) that can occasionally return a transient error
+  // (e.g. 404) especially when called from a real https origin like GitHub Pages.
+  // Retry a couple of times with a short delay before giving up.
+  async function fetchWithRetry(url, options, attempts){
+    attempts = attempts || 3;
+    let lastErr;
+    for (let i = 0; i < attempts; i++){
+      try{
+        const res = await fetch(url, options);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res;
+      }catch(err){
+        lastErr = err;
+        if (i < attempts - 1) await new Promise(r => setTimeout(r, 400 * (i + 1)));
+      }
+    }
+    throw lastErr;
+  }
+
+  async function pullAndMergeAll(){
+    const url = loadSyncUrl();
+    if (!url) return;
+    setSyncStatus('syncing');
+    try{
+      const res = await fetchWithRetry(url, { method: 'GET' });
+      const serverData = await res.json();
+      SYNC_KEYS.forEach(key=>{
+        const storageKey = SYNC_KEY_TO_STORAGE_KEY[key];
+        let localVal = null;
+        try{ localVal = JSON.parse(localStorage.getItem(storageKey) || 'null'); }catch(e){}
+        const merged = mergeForKey(key, serverData[key], localVal);
+        if (merged != null) localStorage.setItem(storageKey, JSON.stringify(merged));
+      });
+      localStorage.setItem(SYNC_LAST_KEY, new Date().toISOString());
+      setSyncStatus('ok');
+      renderAll();
+    }catch(err){
+      setSyncStatus('error', err.message || 'Failed to fetch');
+    }
+  }
+
+  async function pushKey(key){
+    const url = loadSyncUrl();
+    if (!url) return;
+    const storageKey = SYNC_KEY_TO_STORAGE_KEY[key];
+    let value = null;
+    try{ value = JSON.parse(localStorage.getItem(storageKey) || 'null'); }catch(e){}
+    try{
+      const res = await fetchWithRetry(url, { method: 'POST', body: JSON.stringify({ key, value }) });
+      let body = null;
+      try{ body = await res.json(); }catch(e){ /* some deployments may not echo JSON back; tolerate */ }
+      if (body && body.error) throw new Error(body.error);
+      localStorage.setItem(SYNC_LAST_KEY, new Date().toISOString());
+      setSyncStatus('ok');
+      renderLastUpdatesMeta();
+    }catch(err){
+      setSyncStatus('error', err.message || 'Failed to fetch');
+    }
+  }
+
+  function renderSyncStatusLabel(){
+    const el = document.getElementById('syncStatusLabel');
+    if (!el) return;
+    const url = loadSyncUrl();
+    if (!url){ el.textContent = '未設定（この端末のみ）'; return; }
+    if (syncStatus === 'syncing'){ el.textContent = '同期中…'; return; }
+    if (syncStatus === 'error'){ el.textContent = `エラー: ${syncErrorMessage}`; return; }
+    const last = loadSyncLast();
+    if (last){
+      const dt = new Date(last);
+      el.textContent = `共有: 有効（最終同期 ${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}）`;
+    } else {
+      el.textContent = '共有: 有効（未同期）';
+    }
+  }
+
+  // ---------- encoding detection & CSV parse ----------
+  function decodeBuffer(buffer){
+    const bytes = new Uint8Array(buffer);
+    if (bytes[0]===0xEF && bytes[1]===0xBB && bytes[2]===0xBF){
+      return new TextDecoder('utf-8').decode(buffer);
+    }
+    let sjisText = null, utf8Text = null, sjisScore = Infinity, utf8Score = Infinity;
+    try{
+      sjisText = new TextDecoder('shift_jis', {fatal:false}).decode(buffer);
+      sjisScore = (sjisText.match(/\uFFFD/g) || []).length;
+    }catch(e){}
+    try{
+      utf8Text = new TextDecoder('utf-8', {fatal:false}).decode(buffer);
+      utf8Score = (utf8Text.match(/\uFFFD/g) || []).length;
+    }catch(e){}
+    if (sjisText !== null && sjisScore <= utf8Score) return sjisText;
+    return utf8Text !== null ? utf8Text : (sjisText || '');
+  }
+
+  function parseCSV(text, delimiter){
+    const delim = delimiter || ',';
+    const rows = [];
+    let row = [], field = '', inQuotes = false;
+    const len = text.length;
+    let i = 0;
+    while (i < len){
+      const c = text[i];
+      if (inQuotes){
+        if (c === '"'){
+          if (text[i+1] === '"'){ field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        } else { field += c; i++; continue; }
+      } else {
+        if (c === '"'){ inQuotes = true; i++; continue; }
+        if (c === delim){ row.push(field); field=''; i++; continue; }
+        if (c === '\r'){ i++; continue; }
+        if (c === '\n'){ row.push(field); field=''; rows.push(row); row=[]; i++; continue; }
+        field += c; i++; continue;
+      }
+    }
+    if (field.length > 0 || row.length > 0){ row.push(field); rows.push(row); }
+    return rows.filter(r => !(r.length===1 && r[0]===''));
+  }
+
+  // auto-detect comma (exported CSV) vs tab (pasted spreadsheet range) delimiter
+  function parseDelimitedAuto(text){
+    const firstLine = (text.split('\n')[0] || '');
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    return parseCSV(text, tabCount > commaCount ? '\t' : ',');
+  }
+
+  function rowsToObjects(rows){
+    if (!rows.length) return [];
+    const headers = rows[0];
+    const out = [];
+    for (let i=1;i<rows.length;i++){
+      const r = rows[i];
+      if (!r || r.every(v=>v==='')) continue;
+      const obj = {};
+      headers.forEach((h, idx)=>{ obj[h] = r[idx] !== undefined ? r[idx] : ''; });
+      out.push(obj);
+    }
+    return out;
+  }
+
+  // For spreadsheets with a merged/grouped two-row header (e.g. row1 = 商材名,
+  // row2 = 代理店名), combine both rows into single unique column labels like
+  // "練り香水_LETGOS" so that repeated names (e.g. two "LETGOS" columns for
+  // different 商材) can be told apart, then treat row3+ as the actual data.
+  function applyTwoHeaderRows(rows, enabled){
+    if (!enabled || rows.length < 2) return rows;
+    const combinedHeader = rows[0].map((h1, i)=>{
+      const a = (h1||'').toString().trim();
+      const b = (rows[1][i]||'').toString().trim();
+      if (a && b) return a + '_' + b;
+      return a || b;
+    });
+    return [combinedHeader, ...rows.slice(2)];
+  }
+
+  // ---------- domain logic ----------
+  function extractCategory(group){
+    if (!group) return '広告経由なし';
+    const m = group.match(/【(.+?)】/);
+    return m ? m[1] : 'その他';
+  }
+  function isUpsellCode(code){ return /upsell/i.test(code || ''); }
+  function toDateParts(dtStr){
+    const datePart = (dtStr || '').split(' ')[0];
+    const parts = datePart.split('/');
+    if (parts.length < 3) return { date: '', month: '' };
+    const y = parts[0], mo = parts[1].padStart(2,'0'), d = parts[2].padStart(2,'0');
+    return { date: `${y}-${mo}-${d}`, month: `${y}-${mo}` };
+  }
+  function buildRecord(row){
+    const dt = (row['受注日'] || '').trim();
+    if (!dt) return null;
+    const { date, month } = toDateParts(dt);
+    if (!date) return null;
+    const group = (row['広告URLグループ名'] || '').trim();
+    const agencyRaw = (row['広告主名'] || '').trim();
+    const category = extractCategory(group);
+    const agency = agencyRaw || '自社(広告経由なし)';
+    const code = row['購入商品（商品コード）'] || '';
+    const type = isUpsellCode(code) ? 'upsell' : 'front';
+    const orderStatus = (row['対応状況'] || '').trim();
+    const paymentStatus = (row['決済状況'] || '').trim();
+    const paymentMethod = (row['支払い方法'] || '').trim();
+    const purchaseUrl = (row['購入URL'] || '').trim();
+    const id = dt + '|' + code + '|' + group + '|' + paymentMethod + '|' + purchaseUrl;
+    return {
+      id, datetime: dt, date, month, category, agency, group, code, type, purchaseUrl,
+      orderStatus, paymentStatus, isCancel: orderStatus === 'キャンセル'
+    };
+  }
+
+  function ingestCSV(text, filename){
+    const rows = parseCSV(text);
+    const objs = rowsToObjects(rows);
+    const existing = loadRecords();
+    const map = {};
+    existing.forEach(r => { map[r.id] = r; });
+    let added = 0, updated = 0, skipped = 0;
+    objs.forEach(row => {
+      const rec = buildRecord(row);
+      if (!rec){ skipped++; return; }
+      if (map[rec.id]) updated++; else added++;
+      map[rec.id] = rec;
+    });
+    const merged = Object.values(map);
+    saveRecords(merged);
+    ensureGroupSettingsForRecords(merged);
+    const hist = loadHistory();
+    hist.unshift({
+      filename, uploadedAt: new Date().toISOString(),
+      rowCount: objs.length, added, updated, skipped, totalAfter: merged.length
+    });
+    saveHistory(hist.slice(0, 50));
+    return { added, updated, skipped, total: merged.length };
+  }
+
+  // ---------- demographics (性別・生年月日・都道府県) ----------
+  function findColumnContaining(headers, part){
+    return headers.find(h => (h||'').includes(part));
+  }
+  function calcAge(birthdateStr){
+    const d = (birthdateStr||'').trim();
+    const m = d.match(/^(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+    if (!m) return null;
+    const bd = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+    if (isNaN(bd.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - bd.getFullYear();
+    const beforeBirthday = (today.getMonth() < bd.getMonth()) ||
+      (today.getMonth() === bd.getMonth() && today.getDate() < bd.getDate());
+    if (beforeBirthday) age--;
+    return age;
+  }
+  function ageDecadeLabel(age){
+    if (age == null || isNaN(age)) return '不明';
+    if (age < 10) return 'その他(10歳未満)';
+    if (age >= 70) return 'その他(70歳以上)';
+    const decade = Math.floor(age/10)*10;
+    return `${decade}代`;
+  }
+
+  function ingestDemographicsCSV(text, filename){
+    const rows = parseCSV(text);
+    if (!rows.length) throw new Error('データを認識できませんでした。');
+    const headers = rows[0];
+    const genderCol = findColumnContaining(headers, '性別');
+    const birthdateCol = findColumnContaining(headers, '生年月日');
+    const prefCol = findColumnContaining(headers, '都道府県');
+    if (!genderCol && !birthdateCol && !prefCol){
+      throw new Error('「性別」「生年月日」「都道府県」のいずれの列も見つかりませんでした。');
+    }
+    const objs = rowsToObjects(rows);
+    const records = objs.map(row=>{
+      const gender = (genderCol ? row[genderCol] : '') || '';
+      const birthdate = (birthdateCol ? row[birthdateCol] : '') || '';
+      const prefecture = (prefCol ? row[prefCol] : '') || '';
+      const age = calcAge(birthdate);
+      return { gender: gender.trim() || '不明', birthdate, prefecture: prefecture.trim() || '不明', age, ageDecade: ageDecadeLabel(age) };
+    });
+    saveDemographics(records);
+    saveDemographicsMeta({ filename, uploadedAt: new Date().toISOString(), rowCount: records.length });
+    return { total: records.length };
+  }
+
+  // ---------- ad type classification (予算運用 / アフィリエイト) ----------
+  function defaultTypeFor(group, agency){
+    if (!group) return 'none'; // 広告経由なし: 広告費なし
+    if (/\(運用\)/.test(group)) return 'budget';
+    if (agency === '自社' || agency === '登録用仮' || agency === '自社(広告経由なし)') return 'budget';
+    return 'affiliate';
+  }
+  function ensureGroupSettingsForRecords(records){
+    const settings = loadGroupSettings();
+    let changed = false;
+    const seen = new Set();
+    records.forEach(r=>{
+      if (!r.group || seen.has(r.group)) { if(r.group) seen.add(r.group); return; }
+      seen.add(r.group);
+      if (!settings[r.group]){
+        settings[r.group] = { type: defaultTypeFor(r.group, r.agency), unitCost: 0, category: r.category, agency: r.agency };
+        changed = true;
+      } else {
+        // keep category/agency reference fresh for display
+        settings[r.group].category = r.category;
+        settings[r.group].agency = r.agency;
+      }
+    });
+    // self-healing: 成果単価 is only meaningful (and only editable) for 'affiliate' type.
+    // If a group was previously affiliate with a unit cost set, then switched to
+    // 予算運用/費用なし, that leftover value would silently double-count on top of
+    // daily budget entries since it's hidden from the UI. Zero it out automatically.
+    Object.keys(settings).forEach(g=>{
+      if (settings[g].type !== 'affiliate' && settings[g].unitCost){
+        settings[g].unitCost = 0;
+        changed = true;
+      }
+    });
+    if (changed) saveGroupSettings(settings);
+    return settings;
+  }
+
+  // ---------- helpers ----------
+  function fmtNum(n){ return (n||0).toLocaleString('ja-JP'); }
+  function fmtYen(n){ return '¥' + Math.round(n||0).toLocaleString('ja-JP'); }
+  function fmtPct(n){ return isFinite(n) ? n.toFixed(1)+'%' : '—'; }
+  function pct(numerator, denom){ return denom>0 ? (numerator/denom*100) : NaN; }
+  function todayStr(d){
+    const dt = d || new Date();
+    const y = dt.getFullYear(), m = String(dt.getMonth()+1).padStart(2,'0'), day = String(dt.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+  function addDays(dateStr, delta){
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate()+delta);
+    return todayStr(d);
+  }
+  function filterRecords(records, {from, to, category, agency} = {}){
+    return records.filter(r=>{
+      if (from && r.date < from) return false;
+      if (to && r.date > to) return false;
+      if (category && r.category !== category) return false;
+      if (agency && r.agency !== agency) return false;
+      return true;
+    });
+  }
+  function uniqueSorted(arr){ return Array.from(new Set(arr)).sort((a,b)=>a.localeCompare(b,'ja')); }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function emptyRow(colspan){
+    return `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-dim);">データがありません</td></tr>`;
+  }
+
+  // cost for a set of already-period-filtered records belonging to ONE group
+  // cost = unit-cost portion (成果単価 × 件数, if set) + daily-budget portion (手入力/スプレッドシート取込, if any)
+  // Both are summed regardless of the group's 種別 label, so a group can use either or both
+  // mechanisms — 種別='none' is the only thing that fully disables cost tracking for a group.
+  function costForGroupRecords(groupName, groupRecords, from, to){
+    const settings = loadGroupSettings();
+    const s = settings[groupName];
+    if (!s || s.type === 'none') return 0;
+    let cost = 0;
+    if (s.unitCost) cost += groupRecords.length * (Number(s.unitCost)||0);
+    const budgets = loadDailyBudget().filter(b=>b.group === groupName);
+    cost += budgets.filter(b=>{
+      if (from && b.date < from) return false;
+      if (to && b.date > to) return false;
+      return true;
+    }).reduce((sum,b)=>sum + (Number(b.amount)||0), 0);
+    return cost;
+  }
+
+  // cost across a mixed set of records (any groups) for a single period window [from,to]
+  function costForRecordsInWindow(records, from, to){
+    const byGroup = {};
+    records.forEach(r=>{
+      if (!r.group) return;
+      if (!byGroup[r.group]) byGroup[r.group] = [];
+      byGroup[r.group].push(r);
+    });
+    let total = 0;
+    Object.entries(byGroup).forEach(([g, recs])=>{
+      total += costForGroupRecords(g, recs, from, to);
+    });
+    return total;
+  }
+
+  function monthBounds(monthStr){
+    const [y, m] = monthStr.split('-').map(Number);
+    const start = `${monthStr}-01`;
+    const lastDay = new Date(y, m, 0).getDate();
+    const end = `${monthStr}-${String(lastDay).padStart(2,'0')}`;
+    return { start, end };
+  }
+
+  // ---------- shared period presets (当月・先月・先々月・全期間・期間指定) ----------
+  // Computed dynamically from today's date so it stays correct across months
+  // without needing any code changes (e.g. in September this automatically
+  // becomes 当月=9月, then 8月, 7月).
+  function computeMonthPresets(){
+    const today = new Date();
+    const y = today.getFullYear(), m = today.getMonth(); // m is 0-indexed
+    const presets = [];
+    presets.push({ key:'today', label:'当日', from: todayStr(), to: todayStr() });
+    presets.push({ key:'yesterday', label:'前日', from: addDays(todayStr(),-1), to: addDays(todayStr(),-1) });
+    presets.push({ key:'thismonth', label:'当月', from: `${y}-${String(m+1).padStart(2,'0')}-01`, to: todayStr() });
+    for (let i=1;i<=2;i++){
+      let mm = m - i, yy = y;
+      while (mm < 0){ mm += 12; yy--; }
+      const b = monthBounds(`${yy}-${String(mm+1).padStart(2,'0')}`);
+      presets.push({ key:'month-'+i, label:`${mm+1}月`, from:b.start, to:b.end });
+    }
+    presets.push({ key:'all', label:'全期間', from:null, to:null });
+    presets.push({ key:'custom', label:'期間指定', from:null, to:null });
+    return presets;
+  }
+
+  function renderPeriodTabs(containerEl, currentKey, onSelect){
+    const presets = computeMonthPresets();
+    containerEl.innerHTML = presets.map(p=>{
+      const active = currentKey === p.key ? 'active' : '';
+      return `<button type="button" class="cat-btn ${active}" data-period-key="${p.key}" style="${active?'color:var(--accent);border-color:var(--accent);':''}">${escapeHtml(p.label)}</button>`;
+    }).join('');
+    containerEl.querySelectorAll('.cat-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=> onSelect(btn.dataset.periodKey));
+    });
+  }
+
+  function resolvePeriodBounds(key, customFrom, customTo){
+    if (key === 'custom') return { from: customFrom||null, to: customTo||null };
+    const presets = computeMonthPresets();
+    const p = presets.find(x=>x.key===key) || presets[0];
+    return { from: p.from, to: p.to };
+  }
+
+  // ---------- category tab state ----------
+  let dashboardCategory = '';
+  let summaryCategory = '';
+  let trendCategory = '';
+  let dashboardPeriodKey = 'thismonth';
+  let summaryPeriodKey = 'thismonth';
+  let reportPeriodKey = 'thismonth';
+  let trendPeriodKey = 'thismonth';
+  let ltvSelectedCategory = '';
+  let ltvSelectedScenario = 'progress';
+  let ltvSelectedOffer = '';
+
+  function renderCatTabs(containerEl, categories, current, onSelect){
+    const items = [''].concat(categories);
+    containerEl.innerHTML = items.map(cat=>{
+      const label = cat === '' ? 'すべて' : cat;
+      const color = cat === '' ? 'var(--text-dim)' : categoryColorVar(cat);
+      const active = current === cat ? 'active' : '';
+      return `<button type="button" class="cat-btn ${active}" data-cat="${escapeHtml(cat)}" style="color:${active?color:''};border-color:${active?color:''};">
+        ${cat !== '' ? `<span class="dot" style="background:${color};"></span>` : ''}${escapeHtml(label)}
+      </button>`;
+    }).join('');
+    containerEl.querySelectorAll('.cat-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ onSelect(btn.dataset.cat); });
+    });
+  }
+
+  // ---------- dashboard ----------
+  const LANDING_OVERRIDE_KEY = 'lagnet_landing_override_v1';
+  const LANDING_SIM_KEY = 'lagnet_landing_sim_v1';
+
+  function loadLandingOverrides(){
+    try{ return JSON.parse(localStorage.getItem(LANDING_OVERRIDE_KEY) || '{}'); }catch(e){ return {}; }
+  }
+  function saveLandingOverrides(obj){ localStorage.setItem(LANDING_OVERRIDE_KEY, JSON.stringify(obj)); }
+  function currentMonthKey(){
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  }
+  function landingOverrideKeyFor(category){
+    return currentMonthKey() + '|' + (category || 'all');
+  }
+
+  function loadLandingSimRows(){
+    try{ return JSON.parse(localStorage.getItem(LANDING_SIM_KEY) || '[]'); }catch(e){ return []; }
+  }
+  function saveLandingSimRows(arr){ localStorage.setItem(LANDING_SIM_KEY, JSON.stringify(arr)); }
+
+  // computes projected month-end totals: (actual so far) + (daily average so far × remaining days)
+  // per-group version of the same daily-average landing projection, used as the
+  // "baseline" that manual adjustments to a specific 広告URLグループ are compared
+  // against (so editing a group's number only shifts the total by the difference).
+  function computeGroupAutoLanding(group, category){
+    const records = loadRecords();
+    const today = new Date();
+    const y = today.getFullYear(), m = today.getMonth();
+    const monthStart = `${y}-${String(m+1).padStart(2,'0')}-01`;
+    const todayD = todayStr();
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    const dayOfMonth = today.getDate();
+    const remainingDays = Math.max(0, daysInMonth - dayOfMonth);
+
+    const filtered = filterRecords(records, { from: monthStart, to: todayD, category: category||null }).filter(r=>r.group===group);
+    const count = filtered.length;
+    const cost = costForGroupRecords(group, filtered, monthStart, todayD);
+    const dailyAvgCount = dayOfMonth>0 ? count/dayOfMonth : 0;
+    const dailyAvgCost = dayOfMonth>0 ? cost/dayOfMonth : 0;
+    return {
+      count: count + dailyAvgCount*remainingDays,
+      cost: cost + dailyAvgCost*remainingDays
+    };
+  }
+
+  function computeLanding(category, offer){
+    const records = loadRecords();
+    const today = new Date();
+    const y = today.getFullYear(), m = today.getMonth();
+    const monthStart = `${y}-${String(m+1).padStart(2,'0')}-01`;
+    const todayD = todayStr();
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    const dayOfMonth = today.getDate(); // days elapsed so far, including today
+    const remainingDays = Math.max(0, daysInMonth - dayOfMonth);
+
+    const filtered = filterRecords(records, { from: monthStart, to: todayD, category: category||null })
+      .filter(r => !offer || extractOffer(r.group) === offer);
+    const count = filtered.length;
+    const cost = costForRecordsInWindow(filtered, monthStart, todayD);
+
+    const dailyAvgCount = dayOfMonth>0 ? count/dayOfMonth : 0;
+    const dailyAvgCost = dayOfMonth>0 ? cost/dayOfMonth : 0;
+
+    const autoLandingCount = count + dailyAvgCount*remainingDays;
+    const autoLandingCost = cost + dailyAvgCost*remainingDays;
+
+    // adjustments: a list of manual tweaks layered ON TOP of the auto projection.
+    // 'group' adjustments replace that one group's own auto sub-total (so the
+    // overall total shifts by only the difference); 'manual' adjustments are pure
+    // additions (no existing baseline to subtract).
+    const overrides = loadLandingOverrides();
+    const overrideKey = landingOverrideKeyFor(category);
+    let stored = overrides[overrideKey];
+    if (typeof stored === 'number'){
+      // backward-compat: earlier versions stored a single plain count number
+      stored = [{ id:'legacy', costMode:'manual', count: stored, unitCost: 0 }];
+    }
+    const adjustments = Array.isArray(stored) ? stored : [];
+
+    let deltaCount = 0, deltaCost = 0;
+    const adjustmentDetails = adjustments.map(adj=>{
+      if (adj.costMode === 'group' && adj.group){
+        const baseline = computeGroupAutoLanding(adj.group, category);
+        const newCost = costForSimRow(adj.group, Number(adj.count)||0).cost;
+        const dCount = (Number(adj.count)||0) - baseline.count;
+        const dCost = newCost - baseline.cost;
+        deltaCount += dCount;
+        deltaCost += dCost;
+        return Object.assign({}, adj, { baselineCount: baseline.count, baselineCost: baseline.cost, deltaCount: dCount, deltaCost: dCost });
+      }
+      // manual: pure addition, no baseline
+      const dCount = Number(adj.count)||0;
+      const dCost = (Number(adj.count)||0) * (Number(adj.unitCost)||0);
+      deltaCount += dCount;
+      deltaCost += dCost;
+      return Object.assign({}, adj, { baselineCount: 0, baselineCost: 0, deltaCount: dCount, deltaCost: dCost });
+    });
+
+    const hasOverride = adjustments.length > 0;
+    const landingCount = autoLandingCount + deltaCount;
+    const landingCost = autoLandingCost + deltaCost;
+    const landingCpa = landingCost>0 && landingCount>0 ? landingCost/landingCount : NaN;
+
+    return {
+      count, cost, autoLandingCount, autoLandingCost, landingCount, landingCost, landingCpa,
+      dayOfMonth, daysInMonth, remainingDays, hasOverride, overrideKey, adjustments: adjustmentDetails
+    };
+  }
+
+  // split front/upsell version of the same daily-average landing projection,
+  // used to feed the LTV simulation's per-type initial cohort counts
+  function computeLandingSplit(category, offer){
+    const records = loadRecords();
+    const today = new Date();
+    const y = today.getFullYear(), m = today.getMonth();
+    const monthStart = `${y}-${String(m+1).padStart(2,'0')}-01`;
+    const todayD = todayStr();
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    const dayOfMonth = today.getDate();
+    const remainingDays = Math.max(0, daysInMonth - dayOfMonth);
+
+    const filtered = filterRecords(records, { from: monthStart, to: todayD, category: category||null })
+      .filter(r => !offer || extractOffer(r.group) === offer);
+    const frontCount = filtered.filter(r=>r.type==='front').length;
+    const upsellCount = filtered.filter(r=>r.type==='upsell').length;
+
+    const frontLanding = frontCount + (dayOfMonth>0 ? frontCount/dayOfMonth*remainingDays : 0);
+    const upsellLanding = upsellCount + (dayOfMonth>0 ? upsellCount/dayOfMonth*remainingDays : 0);
+
+    return { frontCount, upsellCount, frontLanding, upsellLanding };
+  }
+
+  // ---------- LTV / 収益シミュレーション ----------
+  const LTV_MAX_DAYS = 730; // ~2 years
+  const LTV_EXPLICIT_CYCLES = 13; // cycles 2-13 get individual retention inputs; 14+ share one rate
+  const LTV_DEFAULT_INTERVAL = 30; // fallback days-between-cycles if not configured
+
+  function defaultLtvCategorySettings(){
+    return {
+      frontPriceFirst: 0, frontPriceRepeat: 0,
+      upsellPriceFirst: 0, upsellPriceRepeat: 0,
+      frontCogsFirst: 0, frontCogsRepeat: 0,
+      upsellCogsFirst: 0, upsellCogsRepeat: 0,
+      frontRetention: {},  // { '2': 0.54, '3': 0.53, ... '13': ..., 'rest': 0.9 }
+      upsellRetention: {},
+      frontIntervals: [30],  // days between cycle1→2, 2→3, ... last value repeats (商材共通のデフォルト)
+      upsellIntervals: [30],
+      offerIntervals: {}  // { [オファー名]: { frontIntervals:[...], upsellIntervals:[...] } } — オファー専用の上書き
+    };
+  }
+  // Resolves the front/upsell delivery interval schedule to use: an offer-specific
+  // override if one has been set for this オファー, otherwise the 商材 common default.
+  function getLtvIntervals(category, offer){
+    const s = getLtvCategorySettings(category);
+    if (offer && s.offerIntervals && s.offerIntervals[offer]){
+      const o = s.offerIntervals[offer];
+      return {
+        frontIntervals: o.frontIntervals || s.frontIntervals,
+        upsellIntervals: o.upsellIntervals || s.upsellIntervals,
+        isOfferOverride: true
+      };
+    }
+    return { frontIntervals: s.frontIntervals, upsellIntervals: s.upsellIntervals, isOfferOverride: false };
+  }
+  function loadLtvSettings(){
+    try{ return JSON.parse(localStorage.getItem(LTV_SETTINGS_KEY) || '{}'); }catch(e){ return {}; }
+  }
+  function saveLtvSettings(obj){ localStorage.setItem(LTV_SETTINGS_KEY, JSON.stringify(obj)); pushKey('ltvSettings'); }
+  function getLtvCategorySettings(category){
+    const all = loadLtvSettings();
+    return Object.assign(defaultLtvCategorySettings(), all[category] || {});
+  }
+
+  function defaultLtvGlobal(){
+    return {
+      paymentFeeRate: 0.05,
+      lossRate: 0.10,
+      fixedCostItems: [
+        { id: 'shipping', name: '送料', unitCost: 0 },
+        { id: 'cart', name: 'カート等', unitCost: 0 },
+        { id: 'bundle', name: '同梱物', unitCost: 0 },
+        { id: 'transaction', name: 'トランザクション', unitCost: 0 },
+        { id: 'chat', name: 'チャット成果', unitCost: 0 }
+      ]
+    };
+  }
+  function loadLtvGlobal(){
+    try{
+      const stored = JSON.parse(localStorage.getItem(LTV_GLOBAL_KEY) || 'null');
+      return stored || defaultLtvGlobal();
+    }catch(e){ return defaultLtvGlobal(); }
+  }
+  function saveLtvGlobal(obj){ localStorage.setItem(LTV_GLOBAL_KEY, JSON.stringify(obj)); pushKey('ltvGlobal'); }
+
+  function retentionRateFor(retentionObj, cycle){
+    if (cycle <= 1) return 1;
+    if (cycle <= LTV_EXPLICIT_CYCLES) return Number(retentionObj[String(cycle)]) || 0;
+    return Number(retentionObj['rest']) || 0;
+  }
+
+  // Given a per-cycle interval list (days between consecutive cycles, last value
+  // repeating for any additional cycles), returns how many cycles fit inside
+  // LTV_MAX_DAYS (~2 years) plus each cycle's cumulative day offset.
+  function cycleScheduleFor(intervals){
+    const ivs = (intervals && intervals.length) ? intervals : [LTV_DEFAULT_INTERVAL];
+    const days = [0]; // cycle1 = day 0
+    let day = 0, cycle = 1;
+    while (cycle < 200){ // hard safety cap
+      const idx = Math.min(cycle-1, ivs.length-1);
+      const next = day + (Number(ivs[idx]) || LTV_DEFAULT_INTERVAL);
+      if (next > LTV_MAX_DAYS) break;
+      day = next;
+      cycle++;
+      days.push(day);
+    }
+    return { cycleCount: cycle, days };
+  }
+
+  function parseIntervalsInput(text){
+    return String(text||'').split(/[,、\s]+/).map(s=>Number(s.trim())).filter(n=>!isNaN(n) && n>0);
+  }
+
+  // Projects billing cycles forward (using each type's own delivery interval
+  // schedule) from an initial front/upsell cohort, applying per-cycle retention,
+  // price, and COGS, then buckets each cycle's contribution into the calendar
+  // month it actually lands in (30-day months) rather than raw cycle number —
+  // e.g. an アップセル every 3 months lands its 2nd payment in month 4, not "row 2".
+  // Ad acquisition cost is applied once, in month 1 only (when the customer was
+  // first acquired), regardless of which type's cycle triggered that month.
+  function simulateLTV(category, initialFront, initialUpsell, initialAdCost, offer){
+    const s = getLtvCategorySettings(category);
+    const g = loadLtvGlobal();
+    initialAdCost = initialAdCost || 0;
+
+    const intervals = getLtvIntervals(category, offer);
+    const frontSchedule = cycleScheduleFor(intervals.frontIntervals);
+    const upsellSchedule = cycleScheduleFor(intervals.upsellIntervals);
+
+    const monthMap = {}; // month -> { frontCount, upsellCount, revenue, cogs }
+    function bucket(month){
+      if (!monthMap[month]) monthMap[month] = { frontCount:0, upsellCount:0, revenue:0, cogs:0 };
+      return monthMap[month];
+    }
+
+    let frontCount = initialFront;
+    for (let cycle = 1; cycle <= frontSchedule.cycleCount; cycle++){
+      if (cycle > 1) frontCount = frontCount * retentionRateFor(s.frontRetention, cycle);
+      const month = Math.floor(frontSchedule.days[cycle-1] / 30) + 1;
+      const price = cycle === 1 ? s.frontPriceFirst : s.frontPriceRepeat;
+      const cogsUnit = cycle === 1 ? s.frontCogsFirst : s.frontCogsRepeat;
+      const b = bucket(month);
+      b.frontCount += frontCount;
+      b.revenue += frontCount * price;
+      b.cogs += frontCount * cogsUnit;
+    }
+
+    let upsellCount = initialUpsell;
+    for (let cycle = 1; cycle <= upsellSchedule.cycleCount; cycle++){
+      if (cycle > 1) upsellCount = upsellCount * retentionRateFor(s.upsellRetention, cycle);
+      const month = Math.floor(upsellSchedule.days[cycle-1] / 30) + 1;
+      const price = cycle === 1 ? s.upsellPriceFirst : s.upsellPriceRepeat;
+      const cogsUnit = cycle === 1 ? s.upsellCogsFirst : s.upsellCogsRepeat;
+      const b = bucket(month);
+      b.upsellCount += upsellCount;
+      b.revenue += upsellCount * price;
+      b.cogs += upsellCount * cogsUnit;
+    }
+
+    const maxMonth = Math.max(1, ...Object.keys(monthMap).map(Number));
+    const rows = [];
+    let totalOrders = 0, totalRevenue = 0, totalCogs = 0, totalAdCost = 0, totalOtherCost = 0;
+
+    for (let month = 1; month <= maxMonth; month++){
+      const b = monthMap[month] || { frontCount:0, upsellCount:0, revenue:0, cogs:0 };
+      const orders = b.frontCount + b.upsellCount;
+      const fee = b.revenue * (Number(g.paymentFeeRate)||0);
+      const loss = b.revenue * (Number(g.lossRate)||0);
+      const fixedCost = (g.fixedCostItems||[]).reduce((sum,item)=>sum + (Number(item.unitCost)||0)*orders, 0);
+      const adCost = month === 1 ? initialAdCost : 0;
+      const otherCost = fee + loss + fixedCost;
+      const profit = b.revenue - b.cogs - adCost - otherCost;
+
+      rows.push({ month, frontCount:b.frontCount, upsellCount:b.upsellCount, orders, revenue:b.revenue, cogs:b.cogs, adCost, otherCost, profit });
+      totalOrders += orders;
+      totalRevenue += b.revenue;
+      totalCogs += b.cogs;
+      totalAdCost += adCost;
+      totalOtherCost += otherCost;
+    }
+
+    const totalProfit = totalRevenue - totalCogs - totalAdCost - totalOtherCost;
+    const initialTotal = initialFront + initialUpsell;
+
+    return {
+      rows, totalOrders, totalRevenue, totalCogs, totalAdCost, totalOtherCost, totalProfit,
+      frontCycleCount: frontSchedule.cycleCount, upsellCycleCount: upsellSchedule.cycleCount,
+      ltv: initialTotal>0 ? totalRevenue/initialTotal : 0,
+      profitPerCustomer: initialTotal>0 ? totalProfit/initialTotal : 0
+    };
+  }
+
+  // "オファー" = the price-point/campaign segment of a 広告URLグループ名, shared
+  // across different agencies. e.g. "【練り香水】初回980円_XG" and
+  // "【練り香水】初回980円_LETGOS" are the same オファー「初回980円」.
+  function extractOffer(group){
+    if (!group) return '';
+    const m = group.match(/】(.+)$/);
+    const rest = m ? m[1] : group;
+    const lastUnderscore = rest.lastIndexOf('_');
+    return lastUnderscore === -1 ? rest : rest.slice(0, lastUnderscore);
+  }
+
+  function renderLtvTab(){
+    const records = loadRecords();
+    const allCategories = uniqueSorted(records.map(r=>r.category));
+    if (!ltvSelectedCategory || !allCategories.includes(ltvSelectedCategory)){
+      ltvSelectedCategory = allCategories[0] || '';
+    }
+    renderCatTabs(document.getElementById('ltvCatTabs'), allCategories, ltvSelectedCategory, (cat)=>{
+      ltvSelectedCategory = cat || allCategories[0] || '';
+      renderLtvTab();
+    });
+    document.getElementById('ltvSettingsCategoryLabel').textContent = ltvSelectedCategory || '（商材なし）';
+
+    if (!ltvSelectedCategory){
+      ['ltvProgressKpis','ltvLandingKpis'].forEach(id=>{ document.getElementById(id).innerHTML = '<div class="empty-note">受注データがありません</div>'; });
+      document.getElementById('ltvCycleTable').innerHTML = '';
+      return;
+    }
+
+    // オファー（【商材】初回●●円 のような価格帯セグメント）でさらに絞り込み表示
+    const categoryGroups = uniqueSorted(records.filter(r=>r.category===ltvSelectedCategory && r.group).map(r=>r.group));
+    const offers = uniqueSorted(categoryGroups.map(g=>extractOffer(g)));
+    if (ltvSelectedOffer && !offers.includes(ltvSelectedOffer)) ltvSelectedOffer = '';
+    document.getElementById('ltvOfferTabs').innerHTML = ['すべて'].concat(offers).map(o=>{
+      const val = o==='すべて' ? '' : o;
+      const active = ltvSelectedOffer === val ? 'active' : '';
+      return `<button type="button" class="cat-btn ${active}" data-offer="${escapeHtml(val)}" style="${active?'color:var(--accent);border-color:var(--accent);':''}">${escapeHtml(o)}</button>`;
+    }).join('');
+    document.querySelectorAll('#ltvOfferTabs .cat-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ ltvSelectedOffer = btn.dataset.offer; renderLtvTab(); });
+    });
+
+    const split = computeLandingSplit(ltvSelectedCategory, ltvSelectedOffer);
+    const landingInfo = computeLanding(ltvSelectedCategory, ltvSelectedOffer);
+    const progressSim = simulateLTV(ltvSelectedCategory, split.frontCount, split.upsellCount, landingInfo.cost, ltvSelectedOffer);
+    const landingSim = simulateLTV(ltvSelectedCategory, split.frontLanding, split.upsellLanding, landingInfo.landingCost, ltvSelectedOffer);
+
+    function kpiHtml(sim, initFront, initUpsell){
+      const profitRate = sim.totalRevenue>0 ? (sim.totalProfit/sim.totalRevenue*100) : NaN;
+      return `
+        <div class="kpi"><div class="label">初期件数（フロント/アップセル）</div><div class="value">${fmtNum(Math.round(initFront))} / ${fmtNum(Math.round(initUpsell))}</div></div>
+        <div class="kpi"><div class="label">2年間 累計件数</div><div class="value">${fmtNum(Math.round(sim.totalOrders))}</div></div>
+        <div class="kpi"><div class="label">2年間 売上</div><div class="value accent">${fmtYen(sim.totalRevenue)}</div></div>
+        <div class="kpi"><div class="label">2年間 広告費</div><div class="value">${fmtYen(sim.totalAdCost)}</div></div>
+        <div class="kpi"><div class="label">2年間 利益</div><div class="value ${sim.totalProfit>=0?'good':'danger'}">${fmtYen(sim.totalProfit)}</div><div class="sub">利益率 ${isFinite(profitRate)?profitRate.toFixed(1)+'%':'—'}</div></div>
+        <div class="kpi"><div class="label">LTV（顧客あたり売上）</div><div class="value">${fmtYen(sim.ltv)}</div></div>
+      `;
+    }
+    document.getElementById('ltvProgressKpis').innerHTML = kpiHtml(progressSim, split.frontCount, split.upsellCount);
+    document.getElementById('ltvLandingKpis').innerHTML = kpiHtml(landingSim, split.frontLanding, split.upsellLanding);
+
+
+    // scenario toggle + cycle detail table
+    const scenarios = [{key:'progress',label:'進捗'},{key:'landing',label:'着地想定'}];
+    document.getElementById('ltvScenarioTabs').innerHTML = scenarios.map(s=>{
+      const active = ltvSelectedScenario===s.key ? 'active' : '';
+      return `<button type="button" class="cat-btn ${active}" data-scenario="${s.key}" style="${active?'color:var(--accent);border-color:var(--accent);':''}">${s.label}</button>`;
+    }).join('');
+    document.querySelectorAll('#ltvScenarioTabs .cat-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ ltvSelectedScenario = btn.dataset.scenario; renderLtvTab(); });
+    });
+    const activeSim = ltvSelectedScenario === 'landing' ? landingSim : progressSim;
+    document.getElementById('ltvCycleTable').innerHTML = `
+      <thead><tr><th>ヶ月目</th><th class="num">フロント件数</th><th class="num">アップセル件数</th><th class="num">合計件数</th><th class="num">売上</th><th class="num">原価</th><th class="num">広告費</th><th class="num">その他コスト</th><th class="num">利益</th><th class="num">利益率</th></tr></thead>
+      <tbody>${activeSim.rows.map(r=>{
+        const rowProfitRate = r.revenue>0 ? (r.profit/r.revenue*100) : NaN;
+        return `
+        <tr>
+          <td>${r.month}ヶ月目</td>
+          <td class="num">${r.frontCount>0?fmtNum(Math.round(r.frontCount)):'—'}</td>
+          <td class="num">${r.upsellCount>0?fmtNum(Math.round(r.upsellCount)):'—'}</td>
+          <td class="num">${fmtNum(Math.round(r.orders))}</td>
+          <td class="num">${fmtYen(r.revenue)}</td>
+          <td class="num">${fmtYen(r.cogs)}</td>
+          <td class="num">${r.adCost>0?fmtYen(r.adCost):'—'}</td>
+          <td class="num">${fmtYen(r.otherCost)}</td>
+          <td class="num" style="color:${r.profit>=0?'var(--good)':'var(--danger)'};">${fmtYen(r.profit)}</td>
+          <td class="num">${isFinite(rowProfitRate)?rowProfitRate.toFixed(1)+'%':'—'}</td>
+        </tr>
+      `;}).join('')}
+      <tr class="total-row-top">
+        <td>合計</td>
+        <td class="num" style="text-align:right;">—</td>
+        <td class="num" style="text-align:right;">—</td>
+        <td class="num" style="text-align:right;">${fmtNum(Math.round(activeSim.totalOrders))}</td>
+        <td class="num" style="text-align:right;">${fmtYen(activeSim.totalRevenue)}</td>
+        <td class="num" style="text-align:right;">${fmtYen(activeSim.totalCogs)}</td>
+        <td class="num" style="text-align:right;">${fmtYen(activeSim.totalAdCost)}</td>
+        <td class="num" style="text-align:right;">${fmtYen(activeSim.totalOtherCost)}</td>
+        <td class="num" style="text-align:right;">${fmtYen(activeSim.totalProfit)}</td>
+        <td class="num" style="text-align:right;">${activeSim.totalRevenue>0?(activeSim.totalProfit/activeSim.totalRevenue*100).toFixed(1)+'%':'—'}</td>
+      </tr>
+      </tbody>
+    `;
+
+    // ---- settings: price / cogs table ----
+    const s = getLtvCategorySettings(ltvSelectedCategory);
+    const priceCogsRows = [
+      { key:'frontPriceFirst', label:'フロント初回単価', val:s.frontPriceFirst },
+      { key:'frontPriceRepeat', label:'フロント継続単価', val:s.frontPriceRepeat },
+      { key:'upsellPriceFirst', label:'アップセル初回単価', val:s.upsellPriceFirst },
+      { key:'upsellPriceRepeat', label:'アップセル継続単価', val:s.upsellPriceRepeat },
+      { key:'frontCogsFirst', label:'フロント初回原価', val:s.frontCogsFirst },
+      { key:'frontCogsRepeat', label:'フロント継続原価', val:s.frontCogsRepeat },
+      { key:'upsellCogsFirst', label:'アップセル初回原価', val:s.upsellCogsFirst },
+      { key:'upsellCogsRepeat', label:'アップセル継続原価', val:s.upsellCogsRepeat }
+    ];
+    document.getElementById('ltvPriceCogsTable').innerHTML = `
+      <thead><tr><th>項目</th><th class="num">金額(円)</th></tr></thead>
+      <tbody>${priceCogsRows.map(r=>`
+        <tr><td style="text-align:left;">${r.label}</td><td class="num"><input type="number" class="ltv-pricecogs-input" data-key="${r.key}" value="${r.val||0}" style="width:100px;text-align:right;"></td></tr>
+      `).join('')}</tbody>
+    `;
+    document.querySelectorAll('.ltv-pricecogs-input').forEach(inp=>{
+      let t=null;
+      function commit(){
+        const all = loadLtvSettings();
+        if (!all[ltvSelectedCategory]) all[ltvSelectedCategory] = defaultLtvCategorySettings();
+        all[ltvSelectedCategory][inp.dataset.key] = Number(inp.value)||0;
+        saveLtvSettings(all);
+        renderLtvTab();
+      }
+      inp.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(commit, 500); });
+      inp.addEventListener('change', ()=>{ clearTimeout(t); commit(); });
+    });
+
+    // ---- settings: retention rate table ----
+    const cycleCols = [];
+    for (let c=2;c<=LTV_EXPLICIT_CYCLES;c++) cycleCols.push(String(c));
+    cycleCols.push('rest');
+    document.getElementById('ltvRetentionTable').innerHTML = `
+      <thead><tr><th>種別</th>${cycleCols.map(c=>`<th class="num">${c==='rest'?`${LTV_EXPLICIT_CYCLES+1}回目以降`:c+'回目'}</th>`).join('')}</tr></thead>
+      <tbody>
+        <tr><td style="text-align:left;">フロント</td>${cycleCols.map(c=>`<td class="num"><input type="number" class="ltv-retention-input" data-type="front" data-cycle="${c}" value="${(s.frontRetention[c]!=null? (s.frontRetention[c]*100).toFixed(0) : '')}" placeholder="%" style="width:56px;text-align:right;"></td>`).join('')}</tr>
+        <tr><td style="text-align:left;">アップセル</td>${cycleCols.map(c=>`<td class="num"><input type="number" class="ltv-retention-input" data-type="upsell" data-cycle="${c}" value="${(s.upsellRetention[c]!=null? (s.upsellRetention[c]*100).toFixed(0) : '')}" placeholder="%" style="width:56px;text-align:right;"></td>`).join('')}</tr>
+      </tbody>
+    `;
+    document.querySelectorAll('.ltv-retention-input').forEach(inp=>{
+      let t=null;
+      function commit(){
+        const all = loadLtvSettings();
+        if (!all[ltvSelectedCategory]) all[ltvSelectedCategory] = defaultLtvCategorySettings();
+        const field = inp.dataset.type === 'front' ? 'frontRetention' : 'upsellRetention';
+        if (!all[ltvSelectedCategory][field]) all[ltvSelectedCategory][field] = {};
+        const pct = Number(inp.value);
+        all[ltvSelectedCategory][field][inp.dataset.cycle] = isNaN(pct) ? 0 : pct/100;
+        saveLtvSettings(all);
+        renderLtvTab();
+      }
+      inp.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(commit, 500); });
+      inp.addEventListener('change', ()=>{ clearTimeout(t); commit(); });
+    });
+
+    // ---- bulk-paste retention (one % per line, in order starting from cycle1) ----
+    document.getElementById('ltvRetentionPasteArea').innerHTML = `
+      <div class="controls" style="margin-top:12px;">
+        <label style="flex-direction:column;align-items:flex-start;width:100%;">フロント：継続率を一括貼り付け（1行1つ、1行目=1回目から）
+          <textarea id="ltvPasteFront" rows="3" style="width:100%;margin-top:4px;background:var(--bg-panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-family:var(--mono);font-size:12px;" placeholder="100%&#10;54%&#10;53%&#10;..."></textarea>
+        </label>
+        <button class="btn" id="ltvPasteFrontBtn">反映</button>
+      </div>
+      <div class="controls">
+        <label style="flex-direction:column;align-items:flex-start;width:100%;">アップセル：継続率を一括貼り付け
+          <textarea id="ltvPasteUpsell" rows="3" style="width:100%;margin-top:4px;background:var(--bg-panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-family:var(--mono);font-size:12px;" placeholder="100%&#10;80%&#10;..."></textarea>
+        </label>
+        <button class="btn" id="ltvPasteUpsellBtn">反映</button>
+      </div>
+    `;
+    function applyRetentionPaste(type){
+      const textarea = document.getElementById(type==='front' ? 'ltvPasteFront' : 'ltvPasteUpsell');
+      const lines = textarea.value.split('\n').map(l=>l.trim()).filter(Boolean);
+      if (!lines.length) return;
+      const all = loadLtvSettings();
+      if (!all[ltvSelectedCategory]) all[ltvSelectedCategory] = defaultLtvCategorySettings();
+      const field = type==='front' ? 'frontRetention' : 'upsellRetention';
+      if (!all[ltvSelectedCategory][field]) all[ltvSelectedCategory][field] = {};
+      lines.forEach((line, idx)=>{
+        const cycle = idx + 1; // line1 -> cycle1
+        if (cycle <= 1) return; // cycle1 is always 100%, no need to store
+        const pct = Number(line.replace('%','').trim());
+        if (isNaN(pct)) return;
+        if (cycle <= LTV_EXPLICIT_CYCLES){
+          all[ltvSelectedCategory][field][String(cycle)] = pct/100;
+        } else {
+          all[ltvSelectedCategory][field]['rest'] = pct/100; // last pasted value beyond explicit cycles becomes the "以降" rate
+        }
+      });
+      saveLtvSettings(all);
+      textarea.value = '';
+      renderLtvTab();
+    }
+    document.getElementById('ltvPasteFrontBtn').addEventListener('click', ()=>applyRetentionPaste('front'));
+    document.getElementById('ltvPasteUpsellBtn').addEventListener('click', ()=>applyRetentionPaste('upsell'));
+
+    // ---- delivery interval settings (お届け頻度) — オファーを選択中ならオファー専用の
+    // 上書き設定、「すべて」選択中は商材共通のデフォルト値を編集する ----
+    const curIntervals = getLtvIntervals(ltvSelectedCategory, ltvSelectedOffer);
+    const editingOffer = !!ltvSelectedOffer;
+    document.getElementById('ltvIntervalSettings').innerHTML = `
+      ${editingOffer ? `
+        <div class="note-box" style="margin-bottom:10px;">
+          「${escapeHtml(ltvSelectedOffer)}」オファー専用の設定を編集しています。${curIntervals.isOfferOverride ? '（このオファー専用の値が設定されています）' : '（今はまだ商材共通の値を使っています。変更するとこのオファー専用の値として保存されます）'}
+          ${curIntervals.isOfferOverride ? '<button class="btn small" id="ltvOfferIntervalResetBtn" style="margin-left:8px;">商材共通の値に戻す</button>' : ''}
+        </div>
+      ` : `
+        <div class="note-box" style="margin-bottom:10px;">商材共通のデフォルト値です。オファータブで特定のオファーを選ぶと、そのオファーだけ別の値を設定できます。</div>
+      `}
+      <div class="controls">
+        <label>フロント：お届け間隔(日, カンマ区切り・最後の値が以降繰り返し)
+          <input type="text" id="ltvFrontIntervals" value="${(curIntervals.frontIntervals||[30]).join(',')}" style="width:160px;">
+        </label>
+        <span class="n">→ 2年間で${cycleScheduleFor(curIntervals.frontIntervals).cycleCount}回目まで</span>
+      </div>
+      <div class="controls">
+        <label>アップセル：お届け間隔(日)
+          <input type="text" id="ltvUpsellIntervals" value="${(curIntervals.upsellIntervals||[30]).join(',')}" style="width:160px;">
+        </label>
+        <span class="n">→ 2年間で${cycleScheduleFor(curIntervals.upsellIntervals).cycleCount}回目まで</span>
+      </div>
+    `;
+    document.getElementById('ltvFrontIntervals').addEventListener('change', (e)=>{
+      const all = loadLtvSettings();
+      if (!all[ltvSelectedCategory]) all[ltvSelectedCategory] = defaultLtvCategorySettings();
+      const parsed = parseIntervalsInput(e.target.value);
+      if (editingOffer){
+        if (!all[ltvSelectedCategory].offerIntervals) all[ltvSelectedCategory].offerIntervals = {};
+        if (!all[ltvSelectedCategory].offerIntervals[ltvSelectedOffer]) all[ltvSelectedCategory].offerIntervals[ltvSelectedOffer] = {};
+        all[ltvSelectedCategory].offerIntervals[ltvSelectedOffer].frontIntervals = parsed;
+      } else {
+        all[ltvSelectedCategory].frontIntervals = parsed;
+      }
+      saveLtvSettings(all);
+      renderLtvTab();
+    });
+    document.getElementById('ltvUpsellIntervals').addEventListener('change', (e)=>{
+      const all = loadLtvSettings();
+      if (!all[ltvSelectedCategory]) all[ltvSelectedCategory] = defaultLtvCategorySettings();
+      const parsed = parseIntervalsInput(e.target.value);
+      if (editingOffer){
+        if (!all[ltvSelectedCategory].offerIntervals) all[ltvSelectedCategory].offerIntervals = {};
+        if (!all[ltvSelectedCategory].offerIntervals[ltvSelectedOffer]) all[ltvSelectedCategory].offerIntervals[ltvSelectedOffer] = {};
+        all[ltvSelectedCategory].offerIntervals[ltvSelectedOffer].upsellIntervals = parsed;
+      } else {
+        all[ltvSelectedCategory].upsellIntervals = parsed;
+      }
+      saveLtvSettings(all);
+      renderLtvTab();
+    });
+    const offerResetBtn = document.getElementById('ltvOfferIntervalResetBtn');
+    if (offerResetBtn){
+      offerResetBtn.addEventListener('click', ()=>{
+        const all = loadLtvSettings();
+        if (all[ltvSelectedCategory] && all[ltvSelectedCategory].offerIntervals){
+          delete all[ltvSelectedCategory].offerIntervals[ltvSelectedOffer];
+          saveLtvSettings(all);
+          renderLtvTab();
+        }
+      });
+    }
+
+    renderLtvGlobalSettings();
+  }
+
+  function renderLtvGlobalSettings(){
+    const g = loadLtvGlobal();
+    const feeInp = document.getElementById('ltvPaymentFeeRate');
+    const lossInp = document.getElementById('ltvLossRate');
+    if (document.activeElement !== feeInp) feeInp.value = ((g.paymentFeeRate||0)*100).toFixed(1);
+    if (document.activeElement !== lossInp) lossInp.value = ((g.lossRate||0)*100).toFixed(1);
+
+    document.getElementById('ltvFixedCostTable').innerHTML = `
+      <thead><tr><th>項目名</th><th class="num">単価(円)</th><th class="num">操作</th></tr></thead>
+      <tbody>${(g.fixedCostItems||[]).map(item=>`
+        <tr data-id="${escapeHtml(item.id)}">
+          <td style="text-align:left;"><input type="text" class="ltv-fixedcost-name" data-id="${escapeHtml(item.id)}" value="${escapeHtml(item.name)}" style="width:140px;"></td>
+          <td class="num"><input type="number" class="ltv-fixedcost-cost" data-id="${escapeHtml(item.id)}" value="${item.unitCost||0}" style="width:90px;text-align:right;"></td>
+          <td class="num"><button class="btn small danger ltv-fixedcost-del" data-id="${escapeHtml(item.id)}">削除</button></td>
+        </tr>
+      `).join('') || emptyRow(3)}</tbody>
+    `;
+
+    function commitFixedCost(id, patch){
+      const cur = loadLtvGlobal();
+      const item = (cur.fixedCostItems||[]).find(x=>x.id===id);
+      if (item) Object.assign(item, patch);
+      saveLtvGlobal(cur);
+    }
+    document.querySelectorAll('.ltv-fixedcost-name').forEach(inp=>{
+      inp.addEventListener('change', ()=> commitFixedCost(inp.dataset.id, { name: inp.value.trim() }));
+    });
+    document.querySelectorAll('.ltv-fixedcost-cost').forEach(inp=>{
+      let t=null;
+      function commit(){ commitFixedCost(inp.dataset.id, { unitCost: Number(inp.value)||0 }); renderLtvTab(); }
+      inp.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(commit, 500); });
+      inp.addEventListener('change', ()=>{ clearTimeout(t); commit(); });
+    });
+    document.querySelectorAll('.ltv-fixedcost-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const cur = loadLtvGlobal();
+        cur.fixedCostItems = (cur.fixedCostItems||[]).filter(x=>x.id!==btn.dataset.id);
+        saveLtvGlobal(cur);
+        renderLtvTab();
+      });
+    });
+  }
+
+  function renderDashboard(){
+    const records = loadRecords();
+    const allCategories = uniqueSorted(records.map(r=>r.category));
+    renderCatTabs(document.getElementById('dashCatTabs'), allCategories, dashboardCategory, (cat)=>{
+      dashboardCategory = cat; renderDashboard();
+    });
+
+    renderPeriodTabs(document.getElementById('dashPeriodTabs'), dashboardPeriodKey, (key)=>{
+      dashboardPeriodKey = key;
+      document.getElementById('dashCustomRangeControls').style.display = key==='custom' ? '' : 'none';
+      renderDashboard();
+    });
+    document.getElementById('dashCustomRangeControls').style.display = dashboardPeriodKey==='custom' ? '' : 'none';
+    const { from, to } = resolvePeriodBounds(
+      dashboardPeriodKey,
+      document.getElementById('dashCustomFrom').value,
+      document.getElementById('dashCustomTo').value
+    );
+
+    const filtered = filterRecords(records, { from, to, category: dashboardCategory || null });
+    const total = filtered.length;
+    const cancels = filtered.filter(r=>r.isCancel).length;
+    const front = filtered.filter(r=>r.type==='front').length;
+    const upsell = filtered.filter(r=>r.type==='upsell').length;
+    const cost = costForRecordsInWindow(filtered, from, to);
+    const validCount = total - cancels;
+    const cpa = cost>0 && total>0 ? cost/total : NaN;
+    const cpaValid = cost>0 && validCount>0 ? cost/validCount : NaN;
+
+    document.getElementById('dashKpis').innerHTML = `
+      <div class="kpi"><div class="label">総獲得件数${dashboardCategory?' ('+escapeHtml(dashboardCategory)+')':''}</div><div class="value accent">${fmtNum(total)}</div></div>
+      <div class="kpi"><div class="label">キャンセル件数</div><div class="value danger">${fmtNum(cancels)}</div><div class="sub">率 ${fmtPct(pct(cancels,total))}</div></div>
+      <div class="kpi"><div class="label">フロント件数</div><div class="value">${fmtNum(front)}</div></div>
+      <div class="kpi"><div class="label">アップセル件数</div><div class="value good">${fmtNum(upsell)}</div><div class="sub">率 ${fmtPct(pct(upsell, front+upsell))}</div></div>
+      <div class="kpi"><div class="label">概算広告費</div><div class="value">${cost>0?fmtYen(cost):'—'}</div><div class="sub">CPA ${isFinite(cpa)?fmtYen(cpa):'—'} ／ CPA(有効) ${isFinite(cpaValid)?fmtYen(cpaValid):'—'}</div></div>
+    `;
+
+    // landing projection — always current-month based regardless of the selected period tab,
+    // but respects the 商材 filter tab for a category-specific projection.
+    const landing = computeLanding(dashboardCategory);
+    document.getElementById('dashLandingKpis').innerHTML = `
+      <div class="kpi">
+        <div class="label">着地件数${dashboardCategory?' ('+escapeHtml(dashboardCategory)+')':''}</div>
+        <div class="value accent" style="display:flex;align-items:center;gap:8px;">
+          <span id="landingCountDisplay">${fmtNum(Math.round(landing.landingCount))}</span>
+          <button class="btn small" id="landingCountEditBtn" title="調整を追加/編集" style="padding:2px 8px;font-size:11px;">✎</button>
+        </div>
+        <div class="sub">自動計算 ${fmtNum(Math.round(landing.autoLandingCount))}件（実績${fmtNum(landing.count)}件・${landing.dayOfMonth}/${landing.daysInMonth}日経過）${landing.hasOverride?' ・ <span style="color:var(--accent);">'+landing.adjustments.length+'件の調整あり</span>':''}</div>
+        <div id="landingOverrideForm" style="display:none;margin-top:10px;"></div>
+      </div>
+      <div class="kpi"><div class="label">着地広告費</div><div class="value">${landing.landingCost>0?fmtYen(landing.landingCost):'—'}</div><div class="sub">自動計算 ${landing.autoLandingCost>0?fmtYen(landing.autoLandingCost):'¥0'}</div></div>
+      <div class="kpi"><div class="label">着地CPA</div><div class="value">${isFinite(landing.landingCpa)?fmtYen(landing.landingCpa):'—'}</div><div class="sub">残り${landing.remainingDays}日を平均値で加算＋調整分</div></div>
+    `;
+
+    const allGroupNamesForOverride = uniqueSorted(Object.keys(loadGroupSettings()));
+
+    function renderLandingOverrideForm(mode){
+      const formEl = document.getElementById('landingOverrideForm');
+      const curMode = mode || 'group';
+      formEl.style.display = '';
+
+      const existingListHtml = landing.adjustments.length ? `
+        <div class="table-wrap" style="margin-bottom:10px;">
+          <table class="data">
+            <thead><tr><th>種別</th><th>内容</th><th class="num">件数</th><th class="num">差分</th><th class="num">操作</th></tr></thead>
+            <tbody>${landing.adjustments.map(adj=>`
+              <tr>
+                <td style="text-align:left;">${adj.costMode==='group'?'グループ':'商材・単価'}</td>
+                <td style="text-align:left;">${adj.costMode==='group'?escapeHtml(adj.group||''):'@'+fmtYen(adj.unitCost||0)}</td>
+                <td class="num">${fmtNum(Math.round(adj.count))}${adj.costMode==='group'?` <span style="color:var(--text-dim);font-size:10.5px;">(自動${fmtNum(Math.round(adj.baselineCount))})</span>`:''}</td>
+                <td class="num" style="color:${adj.deltaCount>=0?'var(--good)':'var(--danger)'};">${adj.deltaCount>=0?'+':''}${fmtNum(Math.round(adj.deltaCount))}</td>
+                <td class="num"><button class="btn small danger ov-adj-del" data-id="${escapeHtml(adj.id)}">削除</button></td>
+              </tr>
+            `).join('')}</tbody>
+          </table>
+        </div>
+      ` : '';
+
+      formEl.innerHTML = `
+        ${existingListHtml}
+        <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px;">新しい調整を追加：</div>
+        <div class="cat-tabs" style="margin-bottom:8px;">
+          <button type="button" class="cat-btn ${curMode==='group'?'active':''}" data-mode="group" style="${curMode==='group'?'color:var(--accent);border-color:var(--accent);':''}">広告URLグループ</button>
+          <button type="button" class="cat-btn ${curMode==='manual'?'active':''}" data-mode="manual" style="${curMode==='manual'?'color:var(--accent);border-color:var(--accent);':''}">商材・成果単価（上乗せ）</button>
+        </div>
+        ${curMode==='group' ? `
+          <div class="controls">
+            <label>広告URLグループ
+              <select id="ovGroup" style="width:220px;">
+                <option value="">（選択してください）</option>
+                ${allGroupNamesForOverride.map(g=>`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
+              </select>
+            </label>
+            <label>件数 <input type="number" id="ovCount" value="0" style="width:100px;"></label>
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">グループを選ぶと、そのグループの自動計算の着地件数が件数欄に入ります。そこから変更した分だけ全体に反映されます。</div>
+        ` : `
+          <div class="controls">
+            <label>成果単価(円) <input type="number" id="ovUnitCost" value="0" style="width:100px;"></label>
+            <label>上乗せ件数 <input type="number" id="ovCount" value="0" style="width:100px;"></label>
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">既存の自動計算に、この件数と費用（単価×件数）がそのまま上乗せされます。</div>
+        `}
+        <div class="controls" style="margin-top:8px;">
+          <button class="btn primary" id="ovApplyBtn">追加</button>
+          <button class="btn" id="ovCancelBtn">閉じる</button>
+        </div>
+      `;
+      formEl.querySelectorAll('[data-mode]').forEach(btn=>{
+        btn.addEventListener('click', ()=> renderLandingOverrideForm(btn.dataset.mode));
+      });
+      if (curMode === 'group'){
+        document.getElementById('ovGroup').addEventListener('change', (e)=>{
+          const g = e.target.value;
+          const countInp = document.getElementById('ovCount');
+          if (g){
+            const baseline = computeGroupAutoLanding(g, dashboardCategory);
+            countInp.value = Math.round(baseline.count);
+          } else {
+            countInp.value = 0;
+          }
+        });
+      }
+      document.getElementById('ovCancelBtn').addEventListener('click', ()=>{ formEl.style.display='none'; formEl.innerHTML=''; });
+      document.querySelectorAll('.ov-adj-del').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const overrides = loadLandingOverrides();
+          let list = overrides[landing.overrideKey];
+          if (typeof list === 'number') list = []; // legacy format, just clear
+          overrides[landing.overrideKey] = (list||[]).filter(a=>a.id!==btn.dataset.id);
+          saveLandingOverrides(overrides);
+          renderDashboard();
+        });
+      });
+      document.getElementById('ovApplyBtn').addEventListener('click', ()=>{
+        const count = Number(document.getElementById('ovCount').value)||0;
+        const overrides = loadLandingOverrides();
+        let list = overrides[landing.overrideKey];
+        if (!Array.isArray(list)) list = [];
+        const id = 'adj-'+Date.now()+'-'+Math.random().toString(36).slice(2,6);
+        if (curMode === 'manual'){
+          const unitCost = Number(document.getElementById('ovUnitCost').value)||0;
+          list.push({ id, costMode:'manual', count, unitCost });
+        } else {
+          const group = document.getElementById('ovGroup').value;
+          if (!group){ alert('広告URLグループを選択してください。'); return; }
+          list.push({ id, costMode:'group', group, count });
+        }
+        overrides[landing.overrideKey] = list;
+        saveLandingOverrides(overrides);
+        renderDashboard();
+      });
+    }
+
+    document.getElementById('landingCountEditBtn').addEventListener('click', ()=>{
+      const formEl = document.getElementById('landingOverrideForm');
+      if (formEl.style.display === 'none' || !formEl.innerHTML){
+        renderLandingOverrideForm();
+      } else {
+        formEl.style.display = 'none';
+        formEl.innerHTML = '';
+      }
+    });
+
+    // category breakdown table (always all categories, same date range, ignores dashboardCategory filter)
+    const rangeFiltered = filterRecords(records, { from, to });
+    const catGroups = {};
+    rangeFiltered.forEach(r=>{
+      if (!catGroups[r.category]) catGroups[r.category] = { total:0, cancel:0, front:0, upsell:0, records:[] };
+      const g = catGroups[r.category];
+      g.total++; if (r.isCancel) g.cancel++;
+      if (r.type==='front') g.front++; else g.upsell++;
+      g.records.push(r);
+    });
+    const catRows = Object.entries(catGroups).sort((a,b)=>b[1].total - a[1].total);
+    document.getElementById('dashCategoryTable').innerHTML = `
+      <thead><tr><th>商材</th><th class="num">獲得件数</th><th class="num">キャンセル率</th><th class="num">アップセル率</th><th class="num">概算広告費</th><th class="num">CPA</th><th class="num">CPA(有効)</th></tr></thead>
+      <tbody>${catRows.map(([cat,g])=>{
+        const cancelRate = pct(g.cancel, g.total);
+        const upsellRate = pct(g.upsell, g.front+g.upsell);
+        const catCost = costForRecordsInWindow(g.records, from, to);
+        const catValid = g.total - g.cancel;
+        const catCpa = catCost>0 && g.total>0 ? catCost/g.total : NaN;
+        const catCpaValid = catCost>0 && catValid>0 ? catCost/catValid : NaN;
+        return `<tr>
+          <td>${categoryTag(cat)}</td>
+          <td class="num">${fmtNum(g.total)}</td>
+          <td class="num cell-rate ${cancelRate>15?'high-cancel':''}">${fmtPct(cancelRate)}</td>
+          <td class="num cell-rate ${upsellRate>15?'high-upsell':''}">${fmtPct(upsellRate)}</td>
+          <td class="num">${catCost>0?fmtYen(catCost):'—'}</td>
+          <td class="num">${isFinite(catCpa)?fmtYen(catCpa):'—'}</td>
+          <td class="num">${isFinite(catCpaValid)?fmtYen(catCpaValid):'—'}</td>
+        </tr>`;
+      }).join('') || emptyRow(7)}</tbody>
+    `;
+
+    // daily bars, last 14 days (respecting category filter)
+    const last14from = addDays(todayStr(), -13);
+    const daily = filterRecords(records, { from: last14from, to: todayStr(), category: dashboardCategory || null });
+    const byDate = {};
+    daily.forEach(r=>{ byDate[r.date] = (byDate[r.date]||0)+1; });
+    const days = [];
+    for (let i=13;i>=0;i--){ days.push(addDays(todayStr(), -i)); }
+    const maxCount = Math.max(1, ...days.map(d=>byDate[d]||0));
+    document.getElementById('dashBars').innerHTML = days.map(d=>{
+      const c = byDate[d]||0;
+      const w = (c/maxCount*100).toFixed(1);
+      const label = d.slice(5);
+      return `<div class="bar-row"><div class="lbl">${label}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%"></div></div><div class="val">${fmtNum(c)}</div></div>`;
+    }).join('') || '<div class="empty-note">データがありません</div>';
+
+    // agency bars (top 8, within selected range + category)
+    const byAgency = {};
+    filtered.forEach(r=>{ byAgency[r.agency] = (byAgency[r.agency]||0)+1; });
+    const agencyEntries = Object.entries(byAgency).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const maxAgency = Math.max(1, ...agencyEntries.map(e=>e[1]));
+    document.getElementById('dashAgencyBars').innerHTML = agencyEntries.map(([name,c])=>{
+      const w = (c/maxAgency*100).toFixed(1);
+      return `<div class="bar-row wide-label"><div class="lbl" title="${escapeHtml(name)}">${escapeHtml(name)}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%"></div></div><div class="val">${fmtNum(c)}</div></div>`;
+    }).join('') || '<div class="empty-note">データがありません</div>';
+
+    // media bars (based on purchase URL 7-9th characters)
+    const hasUrlData = filtered.some(r => r.purchaseUrl && r.purchaseUrl.length >= 9);
+    if (!hasUrlData && filtered.length > 0){
+      document.getElementById('dashMediaBars').innerHTML = `<div class="empty-note">
+        購入URLの情報を持つデータがありません。v1.4.0以降でCSVを再アップロードすると判定できるようになります（同じCSVを再アップロードしても件数が増えることはありません）。
+      </div>`;
+    } else {
+      const byMedia = {};
+      filtered.forEach(r=>{
+        const label = mediaLabelFor(r.purchaseUrl);
+        const key = label || '未設定・その他';
+        byMedia[key] = (byMedia[key]||0)+1;
+      });
+      const mediaEntries = Object.entries(byMedia).sort((a,b)=>b[1]-a[1]);
+      const maxMedia = Math.max(1, ...mediaEntries.map(e=>e[1]));
+      document.getElementById('dashMediaBars').innerHTML = mediaEntries.map(([name,c])=>{
+        const w = (c/maxMedia*100).toFixed(1);
+        return `<div class="bar-row wide-label"><div class="lbl" title="${escapeHtml(name)}">${escapeHtml(name)}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%"></div></div><div class="val">${fmtNum(c)}</div></div>`;
+      }).join('') || '<div class="empty-note">データがありません</div>';
+    }
+
+    document.getElementById('dataMeta').textContent = `データ ${fmtNum(records.length)}件`;
+
+    renderLandingSim();
+  }
+
+  // ---------- landing simulation (per ad-group projected count -> cost) ----------
+  function costForSimRow(group, count){
+    const settings = loadGroupSettings();
+    const s = settings[group];
+    if (!s) return { cost: 0, missingUnitCost: true, reason: 'not-registered' };
+    if (s.type === 'none') return { cost: 0, missingUnitCost: false };
+    if (s.type === 'affiliate'){
+      if (!s.unitCost) return { cost: 0, missingUnitCost: true, reason: 'no-unit-cost' };
+      return { cost: count * s.unitCost, missingUnitCost: false };
+    }
+    // budget type -> derive from this group's average CPA so far this month
+    const today = new Date();
+    const y = today.getFullYear(), m = today.getMonth();
+    const monthStart = `${y}-${String(m+1).padStart(2,'0')}-01`;
+    const avgCpa = computeGroupAvgCPA(group, loadRecords(), monthStart, todayStr());
+    if (!isFinite(avgCpa)) return { cost: 0, missingUnitCost: true, reason: 'no-cpa-data' };
+    return { cost: count * avgCpa, missingUnitCost: false };
+  }
+
+  function renderLandingSim(){
+    const rows = loadLandingSimRows();
+    const settings = loadGroupSettings();
+    const allGroupNames = uniqueSorted(Object.keys(settings));
+
+    let totalCount = 0, totalCost = 0;
+
+    const bodyRows = rows.map(row=>{
+      const g = row.group;
+      const calc = g ? costForSimRow(g, Number(row.count)||0) : { cost:0, missingUnitCost:false };
+      totalCount += Number(row.count)||0;
+      totalCost += calc.cost;
+
+      const groupOptions = allGroupNames.map(gn=>{
+        const isTemp = settings[gn] && settings[gn].temporary;
+        return `<option value="${escapeHtml(gn)}" ${gn===g?'selected':''}>${escapeHtml(gn)}${isTemp?' (臨時)':''}</option>`;
+      }).join('');
+
+      let alertHtml = '';
+      if (g && calc.missingUnitCost){
+        if (calc.reason === 'no-unit-cost'){
+          alertHtml = `<div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="color:var(--danger);font-size:11px;">⚠ 成果単価が未設定です</span>
+            <input type="number" class="sim-unitcost-input" data-row-id="${row.id}" placeholder="成果単価(円)" style="width:110px;">
+            <button class="btn small primary sim-unitcost-save" data-row-id="${row.id}">設定して反映</button>
+          </div>`;
+        } else if (calc.reason === 'no-cpa-data'){
+          alertHtml = `<div style="margin-top:6px;"><span style="color:var(--danger);font-size:11px;">⚠ このグループのCPA実績データがありません（広告費設定タブで日別広告費を入力してください）</span></div>`;
+        }
+      }
+
+      return `<tr data-row-id="${row.id}">
+        <td style="text-align:left;">
+          <select class="sim-group-select" data-row-id="${row.id}" style="width:230px;">
+            <option value="">（選択してください）</option>
+            ${groupOptions}
+            <option value="__new__">＋ 新しいグループを追加</option>
+          </select>
+          ${alertHtml}
+        </td>
+        <td class="num"><input type="number" class="sim-count-input" data-row-id="${row.id}" value="${row.count||0}" min="0" style="width:90px;text-align:right;"></td>
+        <td class="num sim-cost-cell" data-row-id="${row.id}">${calc.cost>0?fmtYen(calc.cost):'—'}</td>
+        <td class="num"><button class="btn small danger sim-row-del" data-row-id="${row.id}">削除</button></td>
+      </tr>`;
+    }).join('');
+
+    const totalRowHtml = rows.length ? `<tr class="total-row">
+      <td colspan="1">合計</td>
+      <td class="num" style="text-align:right;" id="simTotalCount">${fmtNum(totalCount)}</td>
+      <td class="num" style="text-align:right;" id="simTotalCost">${totalCost>0?fmtYen(totalCost):'—'}</td>
+      <td></td>
+    </tr>` : '';
+
+    document.getElementById('landingSimTable').innerHTML = `
+      <thead><tr><th>広告URLグループ</th><th class="num">着地件数</th><th class="num">概算広告費</th><th class="num">操作</th></tr></thead>
+      <tbody>${bodyRows || emptyRow(4)}${totalRowHtml}</tbody>
+    `;
+
+    document.querySelectorAll('.sim-group-select').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
+        const rowId = sel.dataset.rowId;
+        if (sel.value === '__new__'){
+          showNewTempGroupForm(rowId);
+          renderLandingSim(); // redraw select back to previous state while form is shown
+          return;
+        }
+        const arr = loadLandingSimRows();
+        const r = arr.find(x=>x.id===rowId);
+        if (r){ r.group = sel.value; saveLandingSimRows(arr); }
+        renderLandingSim();
+      });
+    });
+    document.querySelectorAll('.sim-count-input').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        // live recompute without a full re-render, to keep focus/cursor stable
+        const rowId = inp.dataset.rowId;
+        const arr = loadLandingSimRows();
+        const r = arr.find(x=>x.id===rowId);
+        if (!r) return;
+        const g = r.group;
+        const calc = g ? costForSimRow(g, Number(inp.value)||0) : { cost:0 };
+        const costCell = document.querySelector(`.sim-cost-cell[data-row-id="${CSS.escape(rowId)}"]`);
+        if (costCell) costCell.textContent = calc.cost>0 ? fmtYen(calc.cost) : '—';
+        // live-update the totals row too
+        let liveTotalCount = 0, liveTotalCost = 0;
+        document.querySelectorAll('.sim-count-input').forEach(otherInp=>{
+          const otherId = otherInp.dataset.rowId;
+          const otherRow = arr.find(x=>x.id===otherId);
+          const val = otherId === rowId ? (Number(inp.value)||0) : (Number(otherRow ? otherRow.count : 0)||0);
+          liveTotalCount += val;
+          const otherCalc = otherRow && otherRow.group ? costForSimRow(otherRow.group, val) : { cost:0 };
+          liveTotalCost += otherCalc.cost;
+        });
+        const totalCountEl = document.getElementById('simTotalCount');
+        const totalCostEl = document.getElementById('simTotalCost');
+        if (totalCountEl) totalCountEl.textContent = fmtNum(liveTotalCount);
+        if (totalCostEl) totalCostEl.textContent = liveTotalCost>0 ? fmtYen(liveTotalCost) : '—';
+      });
+      inp.addEventListener('change', ()=>{
+        const rowId = inp.dataset.rowId;
+        const arr = loadLandingSimRows();
+        const r = arr.find(x=>x.id===rowId);
+        if (r){ r.count = Number(inp.value)||0; saveLandingSimRows(arr); }
+      });
+    });
+    document.querySelectorAll('.sim-row-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const arr = loadLandingSimRows().filter(x=>x.id!==btn.dataset.rowId);
+        saveLandingSimRows(arr);
+        renderLandingSim();
+      });
+    });
+    document.querySelectorAll('.sim-unitcost-save').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const rowId = btn.dataset.rowId;
+        const input = document.querySelector(`.sim-unitcost-input[data-row-id="${CSS.escape(rowId)}"]`);
+        const val = Number(input.value);
+        if (!val || val<=0){ alert('成果単価を入力してください。'); return; }
+        const arr = loadLandingSimRows();
+        const r = arr.find(x=>x.id===rowId);
+        if (!r || !r.group) return;
+        const cur = loadGroupSettings();
+        if (!cur[r.group]) cur[r.group] = { type:'affiliate', unitCost:0 };
+        cur[r.group].unitCost = val;
+        saveGroupSettings(cur); // reflected into the master 広告費設定 automatically
+        renderLandingSim();
+        renderCostTab();
+      });
+    });
+  }
+
+  function showNewTempGroupForm(rowId){
+    const allCategories = uniqueSorted(loadRecords().map(r=>r.category));
+    const el = document.getElementById('landingSimAlert');
+    el.innerHTML = `
+      <div class="panel" style="background:var(--bg-panel-2);margin-bottom:12px;">
+        <h2 style="font-size:13px;">新しい広告URLグループを臨時で追加</h2>
+        <div class="controls">
+          <label>グループ名 <input type="text" id="newGroupName" style="width:200px;" placeholder="例: 【練り香水】新規媒体テスト"></label>
+          <label>商材
+            <select id="newGroupCategory">
+              ${allCategories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+              <option value="__custom__">その他（自由入力）</option>
+            </select>
+          </label>
+          <input type="text" id="newGroupCategoryCustom" style="display:none;width:120px;" placeholder="商材名">
+          <label>代理店 <input type="text" id="newGroupAgency" style="width:140px;" placeholder="例: 新規ASP"></label>
+          <label>種別
+            <select id="newGroupType">
+              <option value="affiliate">アフィリエイト</option>
+              <option value="budget">予算運用</option>
+            </select>
+          </label>
+          <label>成果単価(円) <input type="number" id="newGroupUnitCost" style="width:100px;" placeholder="任意"></label>
+        </div>
+        <div class="controls">
+          <button class="btn primary" id="newGroupCreateBtn">作成してこの行に設定</button>
+          <button class="btn" id="newGroupCancelBtn">キャンセル</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('newGroupCategory').addEventListener('change', (e)=>{
+      document.getElementById('newGroupCategoryCustom').style.display = e.target.value==='__custom__' ? '' : 'none';
+    });
+    document.getElementById('newGroupCancelBtn').addEventListener('click', ()=>{ el.innerHTML=''; });
+    document.getElementById('newGroupCreateBtn').addEventListener('click', ()=>{
+      const name = document.getElementById('newGroupName').value.trim();
+      const catSel = document.getElementById('newGroupCategory').value;
+      const category = catSel==='__custom__' ? document.getElementById('newGroupCategoryCustom').value.trim() : catSel;
+      const agency = document.getElementById('newGroupAgency').value.trim() || '自社(臨時)';
+      const type = document.getElementById('newGroupType').value;
+      const unitCost = Number(document.getElementById('newGroupUnitCost').value) || 0;
+      if (!name || !category){ alert('グループ名と商材は必須です。'); return; }
+      const cur = loadGroupSettings();
+      if (cur[name]){ alert('同じ名前のグループが既に存在します。'); return; }
+      cur[name] = { type, unitCost, category, agency, temporary: true };
+      saveGroupSettings(cur);
+      const arr = loadLandingSimRows();
+      const r = arr.find(x=>x.id===rowId);
+      if (r) r.group = name;
+      saveLandingSimRows(arr);
+      el.innerHTML = '';
+      renderLandingSim();
+      renderCostTab();
+    });
+  }
+
+  function renderLastUpdatesMeta(){
+    const el = document.getElementById('lastUpdatesMeta');
+    if (!el) return;
+    const hist = loadHistory();
+    const lastUpload = hist.length ? hist[0].uploadedAt : null;
+    const lastBudget = localStorage.getItem(BUDGET_LAST_UPDATED_KEY);
+
+    function fmt(iso){
+      if (!iso) return '—';
+      const dt = new Date(iso);
+      return `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    }
+    el.innerHTML = `受注CSV取込: ${fmt(lastUpload)}　広告費更新: ${fmt(lastBudget)}${loadSyncUrl() ? `　共有同期: ${fmt(loadSyncLast())}` : ''}`;
+  }
+
+  // ---------- summary tab ----------
+  function renderSummary(){
+    const records = loadRecords();
+    const allCategories = uniqueSorted(records.map(r=>r.category));
+    renderCatTabs(document.getElementById('sumCatTabs'), allCategories, summaryCategory, (cat)=>{
+      summaryCategory = cat; renderSummary();
+    });
+
+    renderPeriodTabs(document.getElementById('sumPeriodTabs'), summaryPeriodKey, (key)=>{
+      summaryPeriodKey = key;
+      document.getElementById('sumCustomRangeControls').style.display = key==='custom' ? '' : 'none';
+      renderSummary();
+    });
+    document.getElementById('sumCustomRangeControls').style.display = summaryPeriodKey==='custom' ? '' : 'none';
+    const { from, to } = resolvePeriodBounds(
+      summaryPeriodKey,
+      document.getElementById('sumFrom').value,
+      document.getElementById('sumTo').value
+    );
+    const sortMode = document.getElementById('sumSort').value;
+
+    const filtered = filterRecords(records, { from: from||null, to: to||null, category: summaryCategory||null });
+
+    document.getElementById('sumRangeLabel').textContent =
+      ` (${from||'全期間'} 〜 ${to||'現在'} / ${fmtNum(filtered.length)}件)`;
+
+    // group by raw ad group first (for accurate cost calc), carrying category+agency
+    const byGroup = {};
+    filtered.forEach(r=>{
+      const k = r.group || `__none__${r.category}__${r.agency}`;
+      if (!byGroup[k]) byGroup[k] = { group: r.group, category:r.category, agency:r.agency, front:0, frontCancel:0, upsell:0, upsellCancel:0, records: [] };
+      const g = byGroup[k];
+      g.records.push(r);
+      if (r.type==='front'){ g.front++; if (r.isCancel) g.frontCancel++; }
+      else { g.upsell++; if (r.isCancel) g.upsellCancel++; }
+    });
+
+    // roll up to category+agency, summing cost from constituent groups
+    const rollup = {};
+    Object.values(byGroup).forEach(g=>{
+      const key = g.category + '\u0001' + g.agency;
+      if (!rollup[key]) rollup[key] = { category:g.category, agency:g.agency, front:0, frontCancel:0, upsell:0, upsellCancel:0, cost:0 };
+      const r = rollup[key];
+      r.front += g.front; r.frontCancel += g.frontCancel;
+      r.upsell += g.upsell; r.upsellCancel += g.upsellCancel;
+      const cost = g.group ? costForGroupRecords(g.group, g.records, from||null, to||null) : 0;
+      r.cost += cost;
+    });
+
+    let rows = Object.values(rollup);
+
+    rows.forEach(g=>{
+      g.total = g.front + g.upsell;
+      g.cancelTotal = g.frontCancel + g.upsellCancel;
+      g.cancelRate = pct(g.cancelTotal, g.total);
+      g.upsellRate = pct(g.upsell, g.total);
+    });
+
+    switch(sortMode){
+      case 'count_asc': rows.sort((a,b)=>a.total-b.total); break;
+      case 'cost_desc': rows.sort((a,b)=>b.cost-a.cost); break;
+      case 'cancel_desc': rows.sort((a,b)=>(b.cancelRate||0)-(a.cancelRate||0)); break;
+      case 'upsell_desc': rows.sort((a,b)=>(b.upsellRate||0)-(a.upsellRate||0)); break;
+      default: rows.sort((a,b)=>b.total-a.total); // count_desc
+    }
+
+    let totalFront=0, totalFrontCancel=0, totalUpsell=0, totalUpsellCancel=0, totalCost=0;
+    const bodyRows = rows.map(g=>{
+      totalFront+=g.front; totalFrontCancel+=g.frontCancel; totalUpsell+=g.upsell; totalUpsellCancel+=g.upsellCancel; totalCost+=g.cost;
+      const validCount = g.total - g.cancelTotal;
+      const cpa = g.cost>0 && g.total>0 ? g.cost/g.total : NaN;
+      const cpaValid = g.cost>0 && validCount>0 ? g.cost/validCount : NaN;
+      return `<tr style="border-left:3px solid ${categoryColorVar(g.category)};">
+        <td>${categoryTag(g.category)}</td>
+        <td>${escapeHtml(g.agency)}</td>
+        <td class="num">${fmtNum(g.front)}</td>
+        <td class="num">${fmtNum(g.upsell)}</td>
+        <td class="num">${fmtNum(g.total)}</td>
+        <td class="num">${fmtNum(g.cancelTotal)}</td>
+        <td class="num cell-rate ${g.cancelRate>15?'high-cancel':''}">${fmtPct(g.cancelRate)}</td>
+        <td class="num cell-rate ${g.upsellRate>15?'high-upsell':''}">${fmtPct(g.upsellRate)}</td>
+        <td class="num">${g.cost>0?fmtYen(g.cost):'—'}</td>
+        <td class="num">${isFinite(cpa)?fmtYen(cpa):'—'}</td>
+        <td class="num">${isFinite(cpaValid)?fmtYen(cpaValid):'—'}</td>
+      </tr>`;
+    }).join('');
+
+    const grandTotal = totalFront+totalUpsell;
+    const grandCancel = totalFrontCancel+totalUpsellCancel;
+    const grandValid = grandTotal - grandCancel;
+    const grandCpa = totalCost>0 && grandTotal>0 ? totalCost/grandTotal : NaN;
+    const grandCpaValid = totalCost>0 && grandValid>0 ? totalCost/grandValid : NaN;
+    const totalRow = `<tr class="total-row-top">
+      <td colspan="2">合計</td>
+      <td class="num" style="text-align:right;">${fmtNum(totalFront)}</td>
+      <td class="num" style="text-align:right;">${fmtNum(totalUpsell)}</td>
+      <td class="num" style="text-align:right;">${fmtNum(grandTotal)}</td>
+      <td class="num" style="text-align:right;">${fmtNum(grandCancel)}</td>
+      <td class="num" style="text-align:right;">${fmtPct(pct(grandCancel, grandTotal))}</td>
+      <td class="num" style="text-align:right;">${fmtPct(pct(totalUpsell, grandTotal))}</td>
+      <td class="num" style="text-align:right;">${totalCost>0?fmtYen(totalCost):'—'}</td>
+      <td class="num" style="text-align:right;">${isFinite(grandCpa)?fmtYen(grandCpa):'—'}</td>
+      <td class="num" style="text-align:right;">${isFinite(grandCpaValid)?fmtYen(grandCpaValid):'—'}</td>
+    </tr>`;
+
+    document.getElementById('sumTable').innerHTML = `
+      <thead><tr>
+        <th>商材</th><th>代理店</th>
+        <th class="num">フロント</th><th class="num">アップセル</th><th class="num">合計</th>
+        <th class="num">キャンセル</th><th class="num">キャンセル率</th><th class="num">アップセル率</th>
+        <th class="num">概算費用</th><th class="num">CPA</th><th class="num">CPA(有効)</th>
+      </tr></thead>
+      <tbody>${rows.length?totalRow:''}${bodyRows || emptyRow(11)}</tbody>
+    `;
+  }
+
+  // ---------- trend tab ----------
+  function renderTrend(){
+    const records = loadRecords();
+    const allCategories = uniqueSorted(records.map(r=>r.category));
+    renderCatTabs(document.getElementById('trendCatTabs'), allCategories, trendCategory, (cat)=>{
+      trendCategory = cat; renderTrend();
+    });
+
+    renderPeriodTabs(document.getElementById('trendPeriodTabs'), trendPeriodKey, (key)=>{
+      trendPeriodKey = key;
+      document.getElementById('trendCustomRangeControls').style.display = key==='custom' ? '' : 'none';
+      renderTrend();
+    });
+    document.getElementById('trendCustomRangeControls').style.display = trendPeriodKey==='custom' ? '' : 'none';
+    const { from, to } = resolvePeriodBounds(
+      trendPeriodKey,
+      document.getElementById('trendCustomFrom').value,
+      document.getElementById('trendCustomTo').value
+    );
+
+    const granularity = document.getElementById('trendGranularity').value;
+    const agency = document.getElementById('trendAgency').value;
+    populateSelect(document.getElementById('trendAgency'), uniqueSorted(records.map(r=>r.agency)), agency);
+
+    const filtered = filterRecords(records, { from: from||null, to: to||null, category: trendCategory||null, agency: agency||null });
+    const field = granularity === 'month' ? 'month' : 'date';
+
+    const groups = {};
+    filtered.forEach(r=>{
+      const k = r[field];
+      if (!k) return;
+      if (!groups[k]) groups[k] = { total:0, cancel:0, front:0, upsell:0, records:[] };
+      groups[k].total++;
+      if (r.isCancel) groups[k].cancel++;
+      if (r.type==='front') groups[k].front++; else groups[k].upsell++;
+      groups[k].records.push(r);
+    });
+    const keys = Object.keys(groups).sort();
+
+    document.getElementById('trendTable').innerHTML = `
+      <thead><tr>
+        <th>${granularity==='month'?'月':'日付'}</th>
+        <th class="num">獲得件数</th>
+        <th class="num">キャンセル件数</th>
+        <th class="num">キャンセル率</th>
+        <th class="num">アップセル件数</th>
+        <th class="num">アップセル率</th>
+        <th class="num">概算広告費</th>
+        <th class="num">CPA</th>
+      </tr></thead>
+      <tbody>${keys.map(k=>{
+        const g = groups[k];
+        const cancelRate = pct(g.cancel, g.total);
+        const upsellRate = pct(g.upsell, g.total);
+        const bounds = granularity === 'month' ? monthBounds(k) : { start: k, end: k };
+        const cost = costForRecordsInWindow(g.records, bounds.start, bounds.end);
+        const cpa = cost>0 && g.total>0 ? cost/g.total : NaN;
+        return `<tr>
+          <td>${k}</td>
+          <td class="num">${fmtNum(g.total)}</td>
+          <td class="num">${fmtNum(g.cancel)}</td>
+          <td class="num cell-rate ${cancelRate>15?'high-cancel':''}">${fmtPct(cancelRate)}</td>
+          <td class="num">${fmtNum(g.upsell)}</td>
+          <td class="num cell-rate ${upsellRate>15?'high-upsell':''}">${fmtPct(upsellRate)}</td>
+          <td class="num">${cost>0?fmtYen(cost):'—'}</td>
+          <td class="num">${isFinite(cpa)?fmtYen(cpa):'—'}</td>
+        </tr>`;
+      }).join('') || emptyRow(8)}</tbody>
+    `;
+  }
+
+  // ---------- report tab (copyable per-category text summary) ----------
+  function renderReport(){
+    renderPeriodTabs(document.getElementById('reportPeriodTabs'), reportPeriodKey, (key)=>{
+      reportPeriodKey = key;
+      document.getElementById('reportCustomRangeControls').style.display = key==='custom' ? '' : 'none';
+      renderReport();
+    });
+    document.getElementById('reportCustomRangeControls').style.display = reportPeriodKey==='custom' ? '' : 'none';
+    const { from, to } = resolvePeriodBounds(
+      reportPeriodKey,
+      document.getElementById('reportCustomFrom').value,
+      document.getElementById('reportCustomTo').value
+    );
+
+    document.getElementById('reportRangeLabel').textContent = ` (${from||'全期間'} 〜 ${to||'現在'})`;
+
+    const records = loadRecords();
+    const filtered = filterRecords(records, { from: from||null, to: to||null });
+    const allCategories = uniqueSorted(records.map(r=>r.category));
+    const REPORT_CATEGORY_ORDER = ['練り香水', 'スクラブ', 'ヘッドスクラブ', 'サプリ', 'ゼノス'];
+    const categories = REPORT_CATEGORY_ORDER.filter(c => allCategories.includes(c));
+
+    const lines = [];
+    categories.forEach(cat=>{
+      const catRecords = filtered.filter(r=>r.category===cat);
+      const count = catRecords.length;
+      const cost = costForRecordsInWindow(catRecords, from, to);
+      const cpa = cost>0 && count>0 ? cost/count : null;
+      lines.push(`＜${cat}＞`);
+      lines.push(`件数：${fmtNum(count)}`);
+      lines.push(`広告費：${cost>0?fmtYen(cost):'¥0'}`);
+      lines.push(`CPA：${cpa!=null?fmtYen(cpa):'—'}`);
+      const catSplit = computeLandingSplit(cat);
+      const catLandingInfo = computeLanding(cat);
+      const catLtv = simulateLTV(cat, catSplit.frontLanding, catSplit.upsellLanding, catLandingInfo.landingCost);
+      lines.push(`2年間売上：${catLtv.totalRevenue>0?fmtYen(catLtv.totalRevenue):''}`);
+      lines.push(`2年間利益：${catLtv.totalRevenue>0?fmtYen(catLtv.totalProfit):''}`);
+      lines.push('');
+    });
+    lines.push('※全商材');
+
+    document.getElementById('reportTextArea').value = lines.join('\n');
+  }
+
+  function populateSelect(sel, values, currentVal){
+    const cur = currentVal !== undefined ? currentVal : sel.value;
+    sel.innerHTML = '<option value="">すべて</option>' + values.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    if (values.includes(cur)) sel.value = cur;
+  }
+
+  // ---------- spreadsheet (published-to-web CSV) import for daily budget ----------
+  // NOTE: mapping is keyed by column INDEX (position), not column name/text.
+  // Spreadsheets sometimes have two columns with the exact same header text
+  // (e.g. two "LETGOS" columns for different 商材) — keying by name would make
+  // both columns share one mapping entry and silently overwrite each other.
+  let lastFetchedSheetHeaders = [];
+  let lastFetchedSheetDataRows = null; // raw array-of-arrays, NOT keyed objects
+
+  function parseFlexibleDate(raw){
+    if (!raw) return '';
+    raw = String(raw).trim();
+    let m = raw.match(/^(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+    if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+    return '';
+  }
+
+  async function fetchSheetCSV(url){
+    const res = await fetch(url, { method: 'GET' });
+    if (!res.ok) throw new Error('HTTPエラー: ' + res.status);
+    return await res.text();
+  }
+
+  function renderSheetMappingUI(){
+    const cfg = loadSheetConfig();
+    const area = document.getElementById('sheetMappingArea');
+    if (!lastFetchedSheetHeaders.length){ area.innerHTML = ''; return; }
+
+    const records = loadRecords();
+    const groupsPresent = uniqueSorted(records.filter(r=>r.group).map(r=>r.group));
+
+    area.innerHTML = `
+      <div class="controls" style="margin-top:12px;">
+        <label>日付列
+          <select id="sheetDateCol">
+            <option value="">（選択してください）</option>
+            ${lastFetchedSheetHeaders.map((h,idx)=>`<option value="${idx}" ${String(cfg.dateColumnIndex)===String(idx)?'selected':''}>${escapeHtml(h)}${lastFetchedSheetHeaders.filter(x=>x===h).length>1?` (${idx+1}列目)`:''}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th style="text-align:left;">スプレッドシートの列</th><th style="text-align:left;">対象の広告URLグループ</th></tr></thead>
+          <tbody>
+            ${lastFetchedSheetHeaders.map((h,idx)=>{
+              const mapped = (cfg.mappings||{})[idx] || '';
+              const isDupName = lastFetchedSheetHeaders.filter(x=>x===h).length > 1;
+              return `<tr>
+                <td style="text-align:left;">${escapeHtml(h)}${isDupName?` <span style="color:var(--text-dim);font-size:11px;">(${idx+1}列目)</span>`:''}</td>
+                <td style="text-align:left;">
+                  <select class="sheet-col-map" data-col-index="${idx}">
+                    <option value="">（使用しない）</option>
+                    ${groupsPresent.map(g=>`<option value="${escapeHtml(g)}" ${mapped===g?'selected':''}>${escapeHtml(g)}</option>`).join('')}
+                  </select>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="controls" style="margin-top:12px;">
+        <button class="btn primary" id="sheetImportBtn">この設定で取込を実行</button>
+      </div>
+    `;
+
+    document.getElementById('sheetDateCol').addEventListener('change', (e)=>{
+      const c = loadSheetConfig(); c.dateColumnIndex = e.target.value; saveSheetConfig(c);
+    });
+    document.querySelectorAll('.sheet-col-map').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
+        const c = loadSheetConfig();
+        if (!c.mappings) c.mappings = {};
+        const idx = sel.dataset.colIndex;
+        if (sel.value) c.mappings[idx] = sel.value;
+        else delete c.mappings[idx];
+        saveSheetConfig(c);
+      });
+    });
+    document.getElementById('sheetImportBtn').addEventListener('click', ()=>executeSheetImport());
+  }
+
+  async function handleSheetFetch(silent){
+    const url = document.getElementById('sheetUrl').value.trim();
+    if (!url){ if (!silent) alert('公開CSVのURLを入力してください。'); return; }
+    const cfg = loadSheetConfig();
+    cfg.url = url;
+    saveSheetConfig(cfg);
+    const resultEl = document.getElementById('sheetImportResult');
+    if (!silent) resultEl.innerHTML = '<div class="empty-note">読み込み中...</div>';
+    try{
+      const text = await fetchSheetCSV(url);
+      let rows = parseCSV(text);
+      rows = applyTwoHeaderRows(rows, document.getElementById('sheetTwoHeaderRows').checked);
+      lastFetchedSheetHeaders = rows[0] || [];
+      lastFetchedSheetDataRows = rows.slice(1).filter(r => r && !r.every(v=>v===''));
+      renderSheetMappingUI();
+
+      // if date column + at least one column mapping already configured and still valid
+      // for these headers, auto-run the import so returning to this tab keeps budget data fresh
+      // without requiring the person to re-click through the mapping UI each time.
+      const mapEntries = Object.entries(cfg.mappings||{}).filter(([idx,group])=>group && Number(idx) < lastFetchedSheetHeaders.length);
+      const dateIdxValid = cfg.dateColumnIndex !== undefined && cfg.dateColumnIndex !== null && cfg.dateColumnIndex !== '' && Number(cfg.dateColumnIndex) < lastFetchedSheetHeaders.length;
+      if (dateIdxValid && mapEntries.length){
+        executeSheetImport(true);
+      } else {
+        resultEl.innerHTML = `<div class="panel" style="margin-top:12px;background:var(--good-soft);border-color:var(--good);">${fmtNum(lastFetchedSheetDataRows.length)}行を読み込みました。列の対応を設定して取込を実行してください。</div>`;
+      }
+    }catch(err){
+      resultEl.innerHTML = `<div class="panel" style="margin-top:12px;background:var(--danger-soft);border-color:var(--danger);">
+        <strong>読み込みエラー:</strong> ${escapeHtml(err.message||'Failed to fetch')}<br>
+        多くの場合、ブラウザのCORS制限でGoogleスプレッドシートのURLに直接アクセスできないことが原因です。下の「直接貼り付け」欄をお使いください。
+      </div>`;
+    }
+  }
+
+  function handlePasteParse(){
+    const text = document.getElementById('sheetPasteArea').value;
+    const resultEl = document.getElementById('sheetImportResult');
+    if (!text.trim()){ alert('スプレッドシートからコピーしたデータを貼り付けてください。'); return; }
+    try{
+      let rows = parseDelimitedAuto(text);
+      rows = applyTwoHeaderRows(rows, document.getElementById('sheetTwoHeaderRows').checked);
+      lastFetchedSheetHeaders = rows[0] || [];
+      lastFetchedSheetDataRows = rows.slice(1).filter(r => r && !r.every(v=>v===''));
+      if (!lastFetchedSheetDataRows.length){ throw new Error('データを認識できませんでした。'); }
+      resultEl.innerHTML = `<div class="panel" style="margin-top:12px;background:var(--good-soft);border-color:var(--good);">${fmtNum(lastFetchedSheetDataRows.length)}行を読み込みました。列の対応を設定して取込を実行してください。</div>`;
+      renderSheetMappingUI();
+    }catch(err){
+      resultEl.innerHTML = `<div class="panel" style="margin-top:12px;background:var(--danger-soft);border-color:var(--danger);"><strong>解析エラー:</strong> ${escapeHtml(err.message||'')}</div>`;
+    }
+  }
+
+  function executeSheetImport(silent){
+    if (!lastFetchedSheetDataRows){ if(!silent) alert('先にシートを読み込んでください。'); return; }
+    const cfg = loadSheetConfig();
+    if (cfg.dateColumnIndex === undefined || cfg.dateColumnIndex === null || cfg.dateColumnIndex === ''){ if(!silent) alert('日付列を選択してください。'); return; }
+    const dateIdx = Number(cfg.dateColumnIndex);
+    const mapEntries = Object.entries(cfg.mappings||{}).filter(([idx,group])=>group);
+    if (!mapEntries.length){ if(!silent) alert('少なくとも1つの列を広告URLグループに割り当ててください。'); return; }
+
+    let imported = 0, skippedRows = 0;
+    const map = {};
+    loadDailyBudget().forEach(b=>{ map[b.id] = b; });
+
+    lastFetchedSheetDataRows.forEach(row=>{
+      const date = parseFlexibleDate(row[dateIdx]);
+      if (!date){ skippedRows++; return; }
+      mapEntries.forEach(([idxStr, group])=>{
+        const idx = Number(idxStr);
+        const raw = (row[idx]||'').toString().replace(/[¥,\s]/g,'');
+        if (!raw) return;
+        const amount = Number(raw);
+        if (isNaN(amount)) return;
+        const id = date + '|' + group;
+        map[id] = { id, date, group, amount };
+        imported++;
+      });
+    });
+
+    saveDailyBudget(Object.values(map));
+    cfg.lastImportedAt = new Date().toISOString();
+    saveSheetConfig(cfg);
+    document.getElementById('sheetImportResult').innerHTML = `<div class="panel" style="margin-top:12px;background:var(--good-soft);border-color:var(--good);">取込完了: ${fmtNum(imported)}件の日別広告費を反映しました${skippedRows?`（日付を認識できず${fmtNum(skippedRows)}行スキップ）`:''}。</div>`;
+    renderSheetLastSyncLabel();
+    renderBudgetTable();
+    renderSummary();
+    renderLastUpdatesMeta();
+  }
+
+  function renderSheetLastSyncLabel(){
+    const cfg = loadSheetConfig();
+    const el = document.getElementById('sheetLastSync');
+    if (!el) return;
+    if (cfg.lastImportedAt){
+      const dt = new Date(cfg.lastImportedAt);
+      el.textContent = `最終取込: ${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    } else {
+      el.textContent = '';
+    }
+  }
+
+  // ---------- cost settings tab ----------
+  let cpaPeriod = 'thismonth';
+
+  function cpaPeriodBounds(period){
+    const today = todayStr();
+    if (period === 'thismonth'){
+      return { from: today.slice(0,7) + '-01', to: today };
+    }
+    if (period === '3months'){
+      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-2);
+      const from = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+      return { from, to: today };
+    }
+    return { from: null, to: today }; // all
+  }
+
+  function computeGroupAvgCPA(groupName, allRecords, from, to){
+    const recs = allRecords.filter(r=> r.group === groupName && (!from || r.date >= from) && (!to || r.date <= to));
+    if (!recs.length) return NaN;
+    const cost = costForGroupRecords(groupName, recs, from, to);
+    if (cost <= 0) return NaN;
+    return cost / recs.length;
+  }
+
+  function renderCostTab(){
+    const records = loadRecords();
+    const settings = ensureGroupSettingsForRecords(records);
+
+    // neutral period tabs (今月 / 直近3ヶ月 / 全期間)
+    const periodOptions = [
+      { key:'thismonth', label:'今月' },
+      { key:'3months', label:'直近3ヶ月' },
+      { key:'all', label:'全期間' }
+    ];
+    document.getElementById('cpaPeriodTabs').innerHTML = periodOptions.map(o=>{
+      const active = cpaPeriod === o.key ? 'active' : '';
+      return `<button type="button" class="cat-btn ${active}" data-period="${o.key}" style="${active?'color:var(--accent);border-color:var(--accent);':''}">${o.label}</button>`;
+    }).join('');
+    document.querySelectorAll('#cpaPeriodTabs .cat-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ cpaPeriod = btn.dataset.period; renderCostTab(); });
+    });
+    const { from: cpaFrom, to: cpaTo } = cpaPeriodBounds(cpaPeriod);
+
+    // build list of groups actually present in data (exclude blank/none groups from editable list),
+    // plus any temporary groups created via the dashboard landing simulator (which may not
+    // have any order records yet since they represent a not-yet-launched campaign).
+    const groupsPresent = {};
+    records.forEach(r=>{
+      if (!r.group) return;
+      if (!groupsPresent[r.group]) groupsPresent[r.group] = { category:r.category, agency:r.agency, count:0 };
+      groupsPresent[r.group].count++;
+    });
+    Object.keys(settings).forEach(g=>{
+      if (settings[g].temporary && !groupsPresent[g]){
+        groupsPresent[g] = { category: settings[g].category, agency: settings[g].agency, count: 0, temporary: true };
+      }
+    });
+    const groupNames = Object.keys(groupsPresent).sort((a,b)=>groupsPresent[b].count-groupsPresent[a].count);
+
+    document.getElementById('groupSettingsCount').textContent = ` (${groupNames.length}件)`;
+
+    document.getElementById('groupSettingsTable').innerHTML = `
+      <thead><tr>
+        <th>広告URLグループ名</th><th>商材</th><th>代理店</th><th class="num">件数</th><th>種別</th><th class="num">成果単価 / 平均CPA</th>
+      </tr></thead>
+      <tbody>${groupNames.map(g=>{
+        const info = groupsPresent[g];
+        const s = settings[g] || { type: defaultTypeFor(g, info.agency), unitCost: 0 };
+        let costCell;
+        if (s.type === 'affiliate'){
+          costCell = `<input type="number" class="group-cost-input" data-group="${escapeHtml(g)}" min="0" step="1" value="${s.unitCost||0}" style="width:90px;text-align:right;"> <span class="save-indicator" data-group-indicator="${escapeHtml(g)}" style="font-size:11px;color:var(--good);opacity:0;transition:opacity .3s;">✓ 保存済み</span>`;
+        } else if (s.type === 'budget'){
+          const avgCpa = computeGroupAvgCPA(g, records, cpaFrom, cpaTo);
+          costCell = `<span style="color:var(--text-dim);">${isFinite(avgCpa)?fmtYen(avgCpa):'—'}</span>`;
+        } else {
+          costCell = `<span style="color:var(--text-dim);">—</span>`;
+        }
+        return `<tr data-group="${escapeHtml(g)}">
+          <td style="text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(g)}">${escapeHtml(g)}${info.temporary?' <span style="color:var(--text-dim);font-size:10.5px;">(臨時)</span>':''}</td>
+          <td style="text-align:left;">${categoryTag(info.category)}</td>
+          <td style="text-align:left;">${escapeHtml(info.agency)}</td>
+          <td class="num">${fmtNum(info.count)}</td>
+          <td style="text-align:left;">
+            <select class="group-type-select" data-group="${escapeHtml(g)}">
+              <option value="affiliate" ${s.type==='affiliate'?'selected':''}>アフィリエイト</option>
+              <option value="budget" ${s.type==='budget'?'selected':''}>予算運用</option>
+              <option value="none" ${s.type==='none'?'selected':''}>費用なし</option>
+            </select>
+          </td>
+          <td class="num">${costCell}</td>
+        </tr>`;
+      }).join('') || emptyRow(6)}</tbody>
+    `;
+
+    document.querySelectorAll('.group-type-select').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
+        const g = sel.dataset.group;
+        const cur = loadGroupSettings();
+        if (!cur[g]) cur[g] = { type:'affiliate', unitCost:0 };
+        cur[g].type = sel.value;
+        if (sel.value !== 'affiliate') cur[g].unitCost = 0; // avoid hidden stale value double-counting
+        saveGroupSettings(cur);
+        renderCostTab();
+      });
+    });
+    document.querySelectorAll('.group-cost-input').forEach(inp=>{
+      let debounceTimer = null;
+      function commitSave(){
+        const g = inp.dataset.group;
+        const cur = loadGroupSettings();
+        if (!cur[g]) cur[g] = { type:'affiliate', unitCost:0 };
+        cur[g].unitCost = Number(inp.value)||0;
+        saveGroupSettings(cur);
+        const indicator = document.querySelector(`.save-indicator[data-group-indicator="${CSS.escape(g)}"]`);
+        if (indicator){
+          indicator.style.opacity = '1';
+          clearTimeout(indicator._fadeTimer);
+          indicator._fadeTimer = setTimeout(()=>{ indicator.style.opacity = '0'; }, 1500);
+        }
+      }
+      // save as the person types (debounced) so nothing is lost even if they
+      // never click away from the field, plus an immediate save on blur/Enter.
+      inp.addEventListener('input', ()=>{
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(commitSave, 500);
+      });
+      inp.addEventListener('change', ()=>{
+        clearTimeout(debounceTimer);
+        commitSave();
+      });
+    });
+
+    // budget group select (only groups classified as 'budget')
+    const budgetGroups = groupNames.filter(g => (settings[g]?.type) === 'budget');
+    const budgetSel = document.getElementById('budgetGroup');
+    const curSel = budgetSel.value;
+    budgetSel.innerHTML = budgetGroups.map(g=>`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('') || '<option value="">（予算運用グループがありません）</option>';
+    if (budgetGroups.includes(curSel)) budgetSel.value = curSel;
+
+    renderBudgetTable();
+  }
+
+  let budgetFilterGroupState = '';
+
+  function renderBudgetTable(){
+    const allBudgets = loadDailyBudget().slice().sort((a,b)=> b.date.localeCompare(a.date));
+
+    // per-group subtotal, so duplicate/overlapping entries are easy to spot at a glance
+    const byGroup = {};
+    allBudgets.forEach(b=>{
+      if (!byGroup[b.group]) byGroup[b.group] = { count:0, total:0 };
+      byGroup[b.group].count++;
+      byGroup[b.group].total += Number(b.amount)||0;
+    });
+    const groupEntries = Object.entries(byGroup).sort((a,b)=>b[1].total-a[1].total);
+    const subtotalEl = document.getElementById('budgetSubtotalTable');
+    if (subtotalEl){
+      subtotalEl.innerHTML = `
+        <thead><tr><th>グループ</th><th class="num">件数（日数）</th><th class="num">合計金額</th></tr></thead>
+        <tbody>${groupEntries.map(([g,info])=>`
+          <tr>
+            <td style="text-align:left;" title="${escapeHtml(g)}">${escapeHtml(g.length>36?g.slice(0,36)+'…':g)}</td>
+            <td class="num">${fmtNum(info.count)}</td>
+            <td class="num">${fmtYen(info.total)}</td>
+          </tr>
+        `).join('') || emptyRow(3)}</tbody>
+      `;
+    }
+
+    // group filter dropdown for the day-by-day list below
+    const filterSel = document.getElementById('budgetFilterGroup');
+    if (filterSel){
+      const allGroupNames = groupEntries.map(([g])=>g).sort((a,b)=>a.localeCompare(b,'ja'));
+      const cur = budgetFilterGroupState;
+      filterSel.innerHTML = '<option value="">すべて</option>' + allGroupNames.map(g=>`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
+      if (allGroupNames.includes(cur)) filterSel.value = cur;
+    }
+    const deleteGroupBtn = document.getElementById('budgetDeleteGroupBtn');
+    if (deleteGroupBtn) deleteGroupBtn.style.display = budgetFilterGroupState ? '' : 'none';
+
+    const budgets = budgetFilterGroupState ? allBudgets.filter(b=>b.group===budgetFilterGroupState) : allBudgets;
+
+    // flag duplicate dates within whatever is currently shown (same group + same date twice is a red flag)
+    const dateGroupCount = {};
+    budgets.forEach(b=>{
+      const k = b.group+'|'+b.date;
+      dateGroupCount[k] = (dateGroupCount[k]||0) + 1;
+    });
+
+    document.getElementById('budgetTable').innerHTML = `
+      <thead><tr><th>日付</th><th>グループ</th><th class="num">金額</th><th class="num">操作</th></tr></thead>
+      <tbody>${budgets.map(b=>{
+        const isDup = dateGroupCount[b.group+'|'+b.date] > 1;
+        return `
+        <tr style="${isDup?'background:var(--danger-soft);':''}">
+          <td>${b.date}${isDup?' <span style="color:var(--danger);font-size:10.5px;">⚠重複</span>':''}</td>
+          <td style="text-align:left;" title="${escapeHtml(b.group)}">${escapeHtml(b.group.length>28?b.group.slice(0,28)+'…':b.group)}</td>
+          <td class="num">${fmtYen(b.amount)}</td>
+          <td class="num"><button class="btn small danger budget-del" data-id="${escapeHtml(b.id)}">削除</button></td>
+        </tr>`;
+      }).join('') || emptyRow(4)}</tbody>
+    `;
+    document.querySelectorAll('.budget-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.dataset.id;
+        const arr = loadDailyBudget().filter(b=>b.id!==id);
+        saveDailyBudget(arr);
+        renderBudgetTable();
+        renderSummary();
+        renderLastUpdatesMeta();
+      });
+    });
+  }
+
+  document.getElementById('sheetFetchBtn').addEventListener('click', ()=>handleSheetFetch());
+  document.getElementById('budgetDeleteGroupBtn').addEventListener('click', ()=>{
+    if (!budgetFilterGroupState) return;
+    if (!confirm(`「${budgetFilterGroupState}」の日別広告費データを全て削除します。よろしいですか？`)) return;
+    const arr = loadDailyBudget().filter(b=>b.group!==budgetFilterGroupState);
+    saveDailyBudget(arr);
+    budgetFilterGroupState = '';
+    renderBudgetTable();
+    renderSummary();
+    renderLastUpdatesMeta();
+  });
+  document.getElementById('budgetFilterGroup').addEventListener('change', (e)=>{
+    budgetFilterGroupState = e.target.value;
+    renderBudgetTable();
+  });
+  document.getElementById('sheetParseBtn').addEventListener('click', handlePasteParse);
+
+  document.getElementById('syncSaveBtn').addEventListener('click', ()=>{
+    const url = document.getElementById('syncUrlInput').value.trim();
+    saveSyncUrl(url);
+    if (url) pullAndMergeAll();
+    else renderSyncStatusLabel();
+  });
+
+  document.getElementById('budgetAddBtn').addEventListener('click', ()=>{
+    const date = document.getElementById('budgetDate').value;
+    const group = document.getElementById('budgetGroup').value;
+    const amount = Number(document.getElementById('budgetAmount').value)||0;
+    if (!date || !group || amount<=0){
+      alert('日付・グループ・金額（0より大きい値）を入力してください。');
+      return;
+    }
+    const id = date + '|' + group;
+    const arr = loadDailyBudget().filter(b=>b.id!==id); // upsert: same date+group overwrites
+    arr.push({ id, date, group, amount });
+    saveDailyBudget(arr);
+    document.getElementById('budgetAmount').value = '';
+    renderBudgetTable();
+    renderSummary();
+    renderLastUpdatesMeta();
+  });
+
+  // ---------- manage tab ----------
+  // ---------- demographics rendering ----------
+  function paletteColor(i, total){
+    const hue = Math.round((360/Math.max(total,1))*i);
+    return `hsl(${hue}, 55%, 55%)`;
+  }
+  function renderPieChart(containerEl, entries){
+    const total = entries.reduce((s,e)=>s+e.value,0);
+    if (!total){ containerEl.innerHTML = '<div class="empty-note">データがありません</div>'; return; }
+    let cursor = 0;
+    const stops = entries.map(e=>{
+      const p = e.value/total*100;
+      const start = cursor;
+      const end = cursor + p;
+      cursor = end;
+      return `${e.color} ${start}% ${end}%`;
+    }).join(', ');
+    const legend = entries.map(e=>{
+      const p = (e.value/total*100).toFixed(1);
+      return `<div class="pie-legend-item"><span class="pie-legend-swatch" style="background:${e.color};"></span><span class="pie-legend-label">${escapeHtml(e.label)}</span><span class="pie-legend-value">${fmtNum(e.value)}件 (${p}%)</span></div>`;
+    }).join('');
+    containerEl.innerHTML = `
+      <div class="pie-chart-wrap">
+        <div class="pie-chart" style="background:conic-gradient(${stops});"></div>
+        <div class="pie-legend">${legend}</div>
+      </div>
+    `;
+  }
+
+  function renderDemographics(){
+    const meta = loadDemographicsMeta();
+    const metaEl = document.getElementById('demoDataMeta');
+    if (metaEl){
+      metaEl.textContent = meta
+        ? `${meta.filename} ・ ${fmtNum(meta.rowCount)}件 ・ ${new Date(meta.uploadedAt).toLocaleString('ja-JP')}`
+        : 'データなし';
+    }
+
+    const data = loadDemographics();
+    if (!data.length){
+      ['demoAgeChart','demoGenderChart','demoPrefChart'].forEach(id=>{
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<div class="empty-note">データがありません</div>';
+      });
+      return;
+    }
+
+    // age decade: fixed 10代-60代 order, then any out-of-range/unknown buckets
+    const ageOrder = ['10代','20代','30代','40代','50代','60代'];
+    const ageCounts = {};
+    data.forEach(d=>{ ageCounts[d.ageDecade] = (ageCounts[d.ageDecade]||0)+1; });
+    const ageEntries = [];
+    ageOrder.forEach(label=>{ if (ageCounts[label]) ageEntries.push({label, value: ageCounts[label]}); });
+    Object.keys(ageCounts).forEach(label=>{ if (!ageOrder.includes(label)) ageEntries.push({label, value: ageCounts[label]}); });
+    ageEntries.forEach((e,i)=>{ e.color = paletteColor(i, ageEntries.length); });
+    renderPieChart(document.getElementById('demoAgeChart'), ageEntries);
+
+    // gender
+    const genderCounts = {};
+    data.forEach(d=>{ genderCounts[d.gender] = (genderCounts[d.gender]||0)+1; });
+    const genderEntries = Object.entries(genderCounts).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
+    genderEntries.forEach((e,i)=>{ e.color = paletteColor(i, genderEntries.length); });
+    renderPieChart(document.getElementById('demoGenderChart'), genderEntries);
+
+    // prefecture: top 10 + その他
+    const prefCounts = {};
+    data.forEach(d=>{ prefCounts[d.prefecture] = (prefCounts[d.prefecture]||0)+1; });
+    const sortedPrefs = Object.entries(prefCounts).sort((a,b)=>b[1]-a[1]);
+    const top10 = sortedPrefs.slice(0,10);
+    const restTotal = sortedPrefs.slice(10).reduce((s,[,v])=>s+v,0);
+    const prefEntries = top10.map(([label,value])=>({label,value}));
+    if (restTotal>0) prefEntries.push({label:'その他', value:restTotal});
+    prefEntries.forEach((e,i)=>{ e.color = paletteColor(i, prefEntries.length); });
+    renderPieChart(document.getElementById('demoPrefChart'), prefEntries);
+  }
+
+  // ---------- media-by-month (from order records, using purchase URL 7-9th chars) ----------
+  let mediaMonthSelected = ''; // '' = auto-pick most recent month with data
+  let mediaFilterCategory = '';
+
+  function computeMediaByMonth(category, agency){
+    const records = filterRecords(loadRecords(), { category: category||null, agency: agency||null });
+    const byMonth = {}; // month -> { mediaLabel -> count }
+    const allMediaLabels = new Set();
+    records.forEach(r=>{
+      if (!r.month) return;
+      const label = mediaLabelFor(r.purchaseUrl) || '未設定・その他';
+      allMediaLabels.add(label);
+      if (!byMonth[r.month]) byMonth[r.month] = {};
+      byMonth[r.month][label] = (byMonth[r.month][label]||0) + 1;
+    });
+    return { byMonth, months: Object.keys(byMonth).sort(), mediaLabels: Array.from(allMediaLabels) };
+  }
+
+  function renderMediaTab(){
+    const allRecords = loadRecords();
+    const allCategories = uniqueSorted(allRecords.map(r=>r.category));
+    renderCatTabs(document.getElementById('mediaFilterCatTabs'), allCategories, mediaFilterCategory, (cat)=>{
+      mediaFilterCategory = cat; renderMediaTab();
+    });
+
+    const agencySel = document.getElementById('mediaFilterAgency');
+    const agency = agencySel.value;
+    populateSelect(agencySel, uniqueSorted(allRecords.map(r=>r.agency)), agency);
+
+    const { byMonth, months, mediaLabels } = computeMediaByMonth(mediaFilterCategory, agency);
+
+    // order media columns by overall total desc, so the biggest channels appear first
+    const mediaTotals = {};
+    mediaLabels.forEach(label=>{ mediaTotals[label] = months.reduce((s,mo)=>s+(byMonth[mo][label]||0),0); });
+    const orderedMedia = mediaLabels.slice().sort((a,b)=>mediaTotals[b]-mediaTotals[a]);
+
+    // pivot table: rows = months, columns = media
+    document.getElementById('mediaMonthTable').innerHTML = `
+      <thead><tr><th>月</th>${orderedMedia.map(l=>`<th class="num">${escapeHtml(l)}</th>`).join('')}<th class="num">合計</th></tr></thead>
+      <tbody>${months.map(mo=>{
+        const rowTotal = orderedMedia.reduce((s,l)=>s+(byMonth[mo][l]||0),0);
+        return `<tr>
+          <td>${mo}</td>
+          ${orderedMedia.map(l=>`<td class="num">${fmtNum(byMonth[mo][l]||0)}</td>`).join('')}
+          <td class="num" style="font-weight:600;">${fmtNum(rowTotal)}</td>
+        </tr>`;
+      }).join('') || emptyRow(orderedMedia.length+2)}</tbody>
+    `;
+
+    // month selector tabs (chronological, most recent last but default-select the most recent)
+    if (!mediaMonthSelected || !months.includes(mediaMonthSelected)){
+      mediaMonthSelected = months.length ? months[months.length-1] : '';
+    }
+    document.getElementById('mediaMonthSelectTabs').innerHTML = months.map(mo=>{
+      const active = mediaMonthSelected === mo ? 'active' : '';
+      return `<button type="button" class="cat-btn ${active}" data-month="${mo}" style="${active?'color:var(--accent);border-color:var(--accent);':''}">${mo}</button>`;
+    }).join('') || '<div class="empty-note">データがありません</div>';
+    document.querySelectorAll('#mediaMonthSelectTabs .cat-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ mediaMonthSelected = btn.dataset.month; renderMediaTab(); });
+    });
+
+    if (!mediaMonthSelected){
+      document.getElementById('mediaMonthBars').innerHTML = '<div class="empty-note">データがありません</div>';
+      document.getElementById('mediaMonthPie').innerHTML = '<div class="empty-note">データがありません</div>';
+      document.getElementById('mediaReportTextArea').value = '';
+      return;
+    }
+
+    const monthData = byMonth[mediaMonthSelected] || {};
+    const entries = Object.entries(monthData).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
+    const monthTotal = entries.reduce((s,e)=>s+e.value,0);
+
+    // bar chart
+    const maxVal = Math.max(1, ...entries.map(e=>e.value));
+    document.getElementById('mediaMonthBars').innerHTML = entries.map(e=>{
+      const w = (e.value/maxVal*100).toFixed(1);
+      return `<div class="bar-row wide-label"><div class="lbl" title="${escapeHtml(e.label)}">${escapeHtml(e.label)}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%"></div></div><div class="val">${fmtNum(e.value)}</div></div>`;
+    }).join('') || '<div class="empty-note">データがありません</div>';
+
+    // pie chart (reuses the same generic pie renderer used in デモグラ)
+    const pieEntries = entries.map((e,i)=>({ label:e.label, value:e.value, color: paletteColor(i, entries.length) }));
+    renderPieChart(document.getElementById('mediaMonthPie'), pieEntries);
+
+    // copyable text
+    const filterNote = [mediaFilterCategory, agency].filter(Boolean).join('・');
+    const lines = [`＜${mediaMonthSelected} 媒体別件数${filterNote?'（'+filterNote+'）':''}＞`];
+    entries.forEach(e=>{
+      const p = monthTotal>0 ? (e.value/monthTotal*100).toFixed(1) : '0.0';
+      lines.push(`${e.label}：${fmtNum(e.value)}件（${p}%）`);
+    });
+    lines.push(`※合計${fmtNum(monthTotal)}件`);
+    document.getElementById('mediaReportTextArea').value = lines.join('\n');
+  }
+
+  function handleDemoFile(file){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const text = decodeBuffer(e.target.result);
+      const existing = loadDemographics();
+      if (existing.length && !confirm(`既に${fmtNum(existing.length)}件のデモグラデータがあります。新しいCSVで全て置き換えますが、よろしいですか？`)){
+        return;
+      }
+      try{
+        const result = ingestDemographicsCSV(text, file.name);
+        document.getElementById('demoUploadResult').innerHTML = `<div class="panel" style="margin-top:12px;background:var(--good-soft);border-color:var(--good);"><strong>取り込み完了:</strong> ${fmtNum(result.total)}件のデモグラデータを読み込みました。</div>`;
+        renderDemographics();
+      }catch(err){
+        document.getElementById('demoUploadResult').innerHTML = `<div class="panel" style="margin-top:12px;background:var(--danger-soft);border-color:var(--danger);"><strong>エラー:</strong> ${escapeHtml(err.message||'')}</div>`;
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function renderMediaMapTable(){
+    const map = loadMediaMap();
+    const codes = Object.keys(map).sort();
+    document.getElementById('mediaMapTable').innerHTML = `
+      <thead><tr><th>コード</th><th>媒体名</th><th class="num">操作</th></tr></thead>
+      <tbody>${codes.map(code=>`
+        <tr>
+          <td style="text-align:left;">
+            <input type="text" class="media-code-edit" data-orig-code="${escapeHtml(code)}" value="${escapeHtml(code)}" maxlength="3" style="width:60px;font-family:var(--mono);text-transform:lowercase;">
+          </td>
+          <td style="text-align:left;">
+            <input type="text" class="media-label-edit" data-orig-code="${escapeHtml(code)}" value="${escapeHtml(map[code])}" style="width:160px;">
+          </td>
+          <td class="num"><button class="btn small danger media-del" data-code="${escapeHtml(code)}">削除</button></td>
+        </tr>
+      `).join('') || emptyRow(3)}</tbody>
+    `;
+
+    function applyRowEdit(origCode){
+      const row = document.querySelector(`.media-code-edit[data-orig-code="${CSS.escape(origCode)}"]`).closest('tr');
+      const codeInput = row.querySelector('.media-code-edit');
+      const labelInput = row.querySelector('.media-label-edit');
+      let newCode = codeInput.value.trim().toLowerCase();
+      const newLabel = labelInput.value.trim();
+      if (newCode.length !== 3 || !newLabel){
+        alert('コードは3文字、媒体名は必須です。');
+        renderMediaMapTable();
+        return;
+      }
+      const cur = loadMediaMap();
+      const prevLabel = cur[origCode];
+      if (newCode !== origCode && cur[newCode]){
+        alert(`「${newCode}」は既に登録されています。`);
+        renderMediaMapTable();
+        return;
+      }
+      if (newCode === origCode && newLabel === prevLabel) return; // no change
+      delete cur[origCode];
+      cur[newCode] = newLabel;
+      saveMediaMap(cur);
+      pushMediaMapHistory({ prevCode: origCode, prevLabel, newCode, newLabel });
+      renderMediaMapTable();
+      renderMediaHistoryTable();
+      renderDashboard();
+    }
+
+    document.querySelectorAll('.media-code-edit').forEach(inp=>{
+      inp.addEventListener('change', ()=> applyRowEdit(inp.dataset.origCode));
+    });
+    document.querySelectorAll('.media-label-edit').forEach(inp=>{
+      inp.addEventListener('change', ()=> applyRowEdit(inp.dataset.origCode));
+    });
+    document.querySelectorAll('.media-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const map2 = loadMediaMap();
+        const code = btn.dataset.code;
+        const prevLabel = map2[code];
+        delete map2[code];
+        saveMediaMap(map2);
+        pushMediaMapHistory({ prevCode: code, prevLabel, newCode: null, newLabel: null });
+        renderMediaMapTable();
+        renderMediaHistoryTable();
+        renderDashboard();
+      });
+    });
+
+    renderUnclassifiedMediaTable();
+    renderMediaHistoryTable();
+  }
+
+  function renderUnclassifiedMediaTable(){
+    const records = loadRecords();
+    const map = loadMediaMap();
+    const buckets = {};
+    records.forEach(r=>{
+      const code = extractMediaCode(r.purchaseUrl);
+      if (!code) return; // no purchaseUrl / too short — not a code, skip
+      if (map[code]) return; // already classified
+      if (!buckets[code]) buckets[code] = { count: 0, samples: [] };
+      buckets[code].count++;
+      if (buckets[code].samples.length < 3 && r.purchaseUrl && !buckets[code].samples.includes(r.purchaseUrl)){
+        buckets[code].samples.push(r.purchaseUrl);
+      }
+    });
+    const entries = Object.entries(buckets).sort((a,b)=>b[1].count-a[1].count);
+    document.getElementById('unclassifiedCount').textContent = entries.length ? ` (${entries.length}件)` : '';
+    document.getElementById('unclassifiedMediaTable').innerHTML = `
+      <thead><tr><th>コード</th><th class="num">件数</th><th>サンプルURL</th><th class="num">操作</th></tr></thead>
+      <tbody>${entries.map(([code, info])=>`
+        <tr>
+          <td style="text-align:left;font-family:var(--mono);">${escapeHtml(code)}</td>
+          <td class="num">${fmtNum(info.count)}</td>
+          <td style="text-align:left;font-family:var(--mono);font-size:11px;color:var(--text-dim);">${info.samples.map(escapeHtml).join(', ')}</td>
+          <td class="num"><button class="btn small media-quickadd" data-code="${escapeHtml(code)}">「${escapeHtml(code)}」を登録</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);">未分類のコードはありません（すべて判定できています）</td></tr>'}</tbody>
+    `;
+    document.querySelectorAll('.media-quickadd').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.getElementById('mediaCodeInput').value = btn.dataset.code;
+        document.getElementById('mediaLabelInput').value = '';
+        document.getElementById('mediaLabelInput').focus();
+      });
+    });
+  }
+
+  function renderMediaHistoryTable(){
+    const hist = loadMediaMapHistory();
+    const el = document.getElementById('mediaHistoryTable');
+    if (!el) return;
+    document.getElementById('mediaHistoryCount').textContent = hist.length ? ` (${hist.length}件)` : '';
+    el.innerHTML = `
+      <thead><tr><th>日時</th><th>変更内容</th><th class="num">操作</th></tr></thead>
+      <tbody>${hist.map(h=>{
+        const dt = new Date(h.timestamp);
+        const dtStr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+        return `<tr style="${h.undone?'opacity:0.5;':''}">
+          <td style="text-align:left;font-family:var(--mono);font-size:11px;">${dtStr}</td>
+          <td style="text-align:left;">${escapeHtml(describeMediaChange(h))}${h.undone?' <span style="color:var(--text-dim);">(取り消し済み)</span>':''}</td>
+          <td class="num"><button class="btn small media-undo" data-id="${escapeHtml(h.id)}" ${h.undone?'disabled':''}>取り消し</button></td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--text-dim);">変更履歴はありません</td></tr>'}</tbody>
+    `;
+    document.querySelectorAll('.media-undo').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        undoMediaMapChange(btn.dataset.id);
+        renderMediaMapTable();
+      });
+    });
+  }
+
+  document.getElementById('mediaAddBtn').addEventListener('click', ()=>{
+    const codeInput = document.getElementById('mediaCodeInput');
+    const labelInput = document.getElementById('mediaLabelInput');
+    const code = codeInput.value.trim().toLowerCase();
+    const label = labelInput.value.trim();
+    if (code.length !== 3 || !label){
+      alert('コードは3文字、媒体名を入力してください。');
+      return;
+    }
+    const map = loadMediaMap();
+    if (map[code]){
+      alert(`「${code}」は既に登録されています。表の中で直接編集してください。`);
+      return;
+    }
+    map[code] = label;
+    saveMediaMap(map);
+    pushMediaMapHistory({ prevCode: null, prevLabel: null, newCode: code, newLabel: label });
+    codeInput.value = '';
+    labelInput.value = '';
+    renderMediaMapTable();
+    renderDashboard();
+  });
+
+
+  function renderHistory(){
+    const hist = loadHistory();
+    document.getElementById('histCount').textContent = hist.length ? ` (${hist.length}件)` : '';
+    if (!hist.length){
+      document.getElementById('historyList').innerHTML = '<div class="empty-note">まだアップロード履歴はありません</div>';
+      return;
+    }
+    document.getElementById('historyList').innerHTML = hist.map(h=>{
+      const dt = new Date(h.uploadedAt);
+      const dtStr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+      return `<div class="history-item">
+        <span class="fname">${escapeHtml(h.filename)}</span>
+        <span>${dtStr} ・ 新規${fmtNum(h.added)} / 更新${fmtNum(h.updated)}${h.skipped?` / スキップ${fmtNum(h.skipped)}`:''}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('totalRecordsLabel').textContent = `合計 ${fmtNum(loadRecords().length)} 件のレコードを保存中`;
+  }
+
+  function handleFile(file){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const text = decodeBuffer(e.target.result);
+      try{
+        const result = ingestCSV(text, file.name);
+        document.getElementById('uploadResult').innerHTML = `
+          <div class="panel" style="margin-top:12px;background:var(--good-soft);border-color:var(--good);">
+            <strong>取り込み完了:</strong> 新規 ${fmtNum(result.added)}件 / 更新 ${fmtNum(result.updated)}件${result.skipped?` / スキップ ${fmtNum(result.skipped)}件`:''}
+            （保存合計 ${fmtNum(result.total)}件）
+            <div id="uploadSyncStatus" style="margin-top:6px;font-size:11.5px;color:var(--text-dim);">${loadSyncUrl()?'共有バックエンドへ反映中…':'共有設定なし（この端末のみ）'}</div>
+          </div>`;
+        renderAll();
+        // the push to the shared backend is fire-and-forget; check back shortly after
+        // and report whether it actually succeeded, since a network/permission error
+        // there would otherwise be invisible until someone happens to look elsewhere.
+        if (loadSyncUrl()){
+          setTimeout(()=>{
+            const statusEl = document.getElementById('uploadSyncStatus');
+            if (!statusEl) return;
+            if (syncStatus === 'error'){
+              statusEl.innerHTML = `<span style="color:var(--danger);">⚠ 共有バックエンドへの反映に失敗しました: ${escapeHtml(syncErrorMessage)}</span>`;
+            } else {
+              statusEl.innerHTML = `<span style="color:var(--good);">✓ 共有バックエンドに反映しました</span>`;
+            }
+          }, 1500);
+        }
+      }catch(err){
+        document.getElementById('uploadResult').innerHTML = `
+          <div class="panel" style="margin-top:12px;background:var(--danger-soft);border-color:var(--danger);">
+            <strong>エラー:</strong> CSVの読み込みに失敗しました。${escapeHtml(err.message||'')}
+          </div>`;
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ---------- wiring ----------
+  function renderAll(){
+    renderDashboard();
+    renderSummary();
+    renderTrend();
+    renderDemographics();
+    renderMediaTab();
+    renderLtvTab();
+    renderReport();
+    renderCostTab();
+    renderHistory();
+    renderMediaMapTable();
+    renderLastUpdatesMeta();
+  }
+
+  document.querySelectorAll('nav.tabs button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      ['dashboard','summary','trend','report','demographics','media','ltv','cost','manage'].forEach(t=>{
+        document.getElementById('tab-'+t).style.display = (t===btn.dataset.tab) ? '' : 'none';
+      });
+      renderAll();
+      if (loadSyncUrl()) pullAndMergeAll();
+      if (btn.dataset.tab === 'manage'){
+        const cfg = loadSheetConfig();
+        if (cfg.url){
+          document.getElementById('sheetUrl').value = cfg.url;
+          handleSheetFetch(true);
+        }
+      }
+    });
+  });
+
+  document.getElementById('dashCustomFrom').addEventListener('change', renderDashboard);
+  document.getElementById('dashCustomTo').addEventListener('change', renderDashboard);
+  document.getElementById('landingSimAddRowBtn').addEventListener('click', ()=>{
+    const arr = loadLandingSimRows();
+    arr.push({ id: Date.now()+'-'+Math.random().toString(36).slice(2,8), group:'', count:0 });
+    saveLandingSimRows(arr);
+    renderLandingSim();
+  });
+  document.getElementById('reportCustomFrom').addEventListener('change', renderReport);
+  document.getElementById('reportCustomTo').addEventListener('change', renderReport);
+  async function copyTextareaToClipboard(textareaId, statusElId){
+    const textarea = document.getElementById(textareaId);
+    const statusEl = document.getElementById(statusElId);
+    try{
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(textarea.value);
+      } else {
+        textarea.select();
+        document.execCommand('copy');
+      }
+      statusEl.textContent = 'コピーしました';
+    }catch(err){
+      textarea.select();
+      try{
+        document.execCommand('copy');
+        statusEl.textContent = 'コピーしました';
+      }catch(err2){
+        statusEl.textContent = 'コピーに失敗しました。テキストを手動で選択してコピーしてください。';
+      }
+    }
+    clearTimeout(statusEl._fadeTimer);
+    statusEl._fadeTimer = setTimeout(()=>{ statusEl.textContent = ''; }, 2500);
+  }
+  document.getElementById('reportCopyBtn').addEventListener('click', ()=>copyTextareaToClipboard('reportTextArea','reportCopyStatus'));
+  document.getElementById('ltvPaymentFeeRate').addEventListener('change', (e)=>{
+    const g = loadLtvGlobal();
+    g.paymentFeeRate = (Number(e.target.value)||0)/100;
+    saveLtvGlobal(g);
+    renderLtvTab();
+  });
+  document.getElementById('ltvLossRate').addEventListener('change', (e)=>{
+    const g = loadLtvGlobal();
+    g.lossRate = (Number(e.target.value)||0)/100;
+    saveLtvGlobal(g);
+    renderLtvTab();
+  });
+  document.getElementById('ltvFixedCostAddBtn').addEventListener('click', ()=>{
+    const g = loadLtvGlobal();
+    if (!g.fixedCostItems) g.fixedCostItems = [];
+    g.fixedCostItems.push({ id: 'fc-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), name:'新規項目', unitCost:0 });
+    saveLtvGlobal(g);
+    renderLtvTab();
+  });
+  document.getElementById('mediaReportCopyBtn').addEventListener('click', ()=>copyTextareaToClipboard('mediaReportTextArea','mediaReportCopyStatus'));
+  document.getElementById('mediaFilterAgency').addEventListener('change', renderMediaTab);
+  document.getElementById('sumFrom').addEventListener('change', renderSummary);
+  document.getElementById('sumTo').addEventListener('change', renderSummary);
+  document.getElementById('sumSort').addEventListener('change', renderSummary);
+  document.getElementById('trendGranularity').addEventListener('change', renderTrend);
+  document.getElementById('trendCustomFrom').addEventListener('change', renderTrend);
+  document.getElementById('trendCustomTo').addEventListener('change', renderTrend);
+  document.getElementById('trendAgency').addEventListener('change', renderTrend);
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  dropzone.addEventListener('click', ()=>fileInput.click());
+  fileInput.addEventListener('change', (e)=>{
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+  ['dragenter','dragover'].forEach(evt=>{
+    dropzone.addEventListener(evt, (e)=>{ e.preventDefault(); dropzone.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(evt=>{
+    dropzone.addEventListener(evt, (e)=>{ e.preventDefault(); dropzone.classList.remove('drag'); });
+  });
+  dropzone.addEventListener('drop', (e)=>{
+    const files = e.dataTransfer.files;
+    if (files.length) handleFile(files[0]);
+  });
+
+  const demoDropzone = document.getElementById('demoDropzone');
+  const demoFileInput = document.getElementById('demoFileInput');
+  demoDropzone.addEventListener('click', ()=>demoFileInput.click());
+  demoFileInput.addEventListener('change', (e)=>{
+    if (e.target.files.length) handleDemoFile(e.target.files[0]);
+  });
+  ['dragenter','dragover'].forEach(evt=>{
+    demoDropzone.addEventListener(evt, (e)=>{ e.preventDefault(); demoDropzone.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(evt=>{
+    demoDropzone.addEventListener(evt, (e)=>{ e.preventDefault(); demoDropzone.classList.remove('drag'); });
+  });
+  demoDropzone.addEventListener('drop', (e)=>{
+    const files = e.dataTransfer.files;
+    if (files.length) handleDemoFile(files[0]);
+  });
+
+  document.getElementById('clearAllBtn').addEventListener('click', ()=>{
+    if (confirm('保存されている全データを削除します。よろしいですか？')){
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(HISTORY_KEY);
+      renderAll();
+    }
+  });
+
+  // init defaults
+  document.getElementById('sumTo').value = todayStr();
+  document.getElementById('sumFrom').value = addDays(todayStr(), -29);
+  document.getElementById('budgetDate').value = todayStr();
+  document.getElementById('verLabel').textContent = 'v' + APP_VERSION;
+  document.getElementById('sheetUrl').value = loadSheetConfig().url || '';
+  document.getElementById('sheetTwoHeaderRows').checked = !!loadSheetConfig().twoHeaderRows;
+  document.getElementById('sheetTwoHeaderRows').addEventListener('change', (e)=>{
+    const cfg = loadSheetConfig();
+    cfg.twoHeaderRows = e.target.checked;
+    saveSheetConfig(cfg);
+  });
+  document.getElementById('syncUrlInput').value = loadSyncUrl();
+  renderSheetLastSyncLabel();
+  renderSyncStatusLabel();
+
+  renderAll();
+  if (loadSyncUrl()) pullAndMergeAll();
+})();
+</script>
+</body>
+</html>
