@@ -491,6 +491,8 @@ table.data-table--fixed th {
   font-weight: 700;
   font-size: 14px;
   background: var(--color-accent-strong);
+  white-space: nowrap;
+  max-width: 100%;
 }
 .bottle-tag::before {
   content: "";

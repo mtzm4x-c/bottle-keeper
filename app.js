@@ -888,6 +888,19 @@ function yearMonthOptions() {
   const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
   return { years, months };
 }
+function dayOptions() {
+  const days = [];
+  for (let d = 1; d <= 31; d++) days.push(String(d).padStart(2, '0'));
+  return days;
+}
+// f.yearMonthは "YYYY-MM"（年月のみ）または "YYYY-MM-DD"（日まで指定）のどちらかを保持する。
+// 日まで指定されていれば完全一致、そうでなければ年月一致で判定する。
+function matchesLastVisitFilter(dateStr, filterValue) {
+  if (!filterValue) return true;
+  if (!dateStr) return false;
+  if (filterValue.length === 10) return dateStr === filterValue;
+  return BKUtil.toYearMonth(dateStr) === filterValue;
+}
 
 function searchBarHtml(options = {}) {
   const f = APP.filters;
@@ -921,7 +934,12 @@ function searchBarHtml(options = {}) {
           <option value="">月</option>
           ${yearMonthOptions().months.map((m) => `<option value="${m}" ${f.yearMonth.slice(5,7) === m ? 'selected' : ''}>${Number(m)}月</option>`).join('')}
         </select>
+        <select id="flt-day" style="flex:1;">
+          <option value="">日（任意）</option>
+          ${dayOptions().map((d) => `<option value="${d}" ${f.yearMonth.length === 10 && f.yearMonth.slice(8,10) === d ? 'selected' : ''}>${Number(d)}日</option>`).join('')}
+        </select>
       </div>
+      <p class="text-faint" style="font-size:12px; margin-top:4px;">日を指定しない場合は、その年月に該当すれば表示されます。</p>
     </div>
     <div class="search-bar__field">
       <label>★残し</label>
@@ -961,13 +979,16 @@ function attachSearchBarEvents(root, onChange) {
   bind('#flt-status', 'status');
   const yearEl = root.querySelector('#flt-year');
   const monthEl = root.querySelector('#flt-month');
+  const dayEl = root.querySelector('#flt-day');
   const updateYearMonth = () => {
     const y = yearEl ? yearEl.value : '';
     const m = monthEl ? monthEl.value : '';
-    APP.filters.yearMonth = (y && m) ? `${y}-${m}` : '';
+    const d = dayEl ? dayEl.value : '';
+    APP.filters.yearMonth = (y && m) ? `${y}-${m}${d ? `-${d}` : ''}` : '';
     onChange();
   };
   if (yearEl) yearEl.addEventListener('change', updateYearMonth);
+  if (dayEl) dayEl.addEventListener('change', updateYearMonth);
   if (monthEl) monthEl.addEventListener('change', updateYearMonth);
   const clearBtn = root.querySelector('#flt-clear');
   if (clearBtn) {
@@ -1007,7 +1028,7 @@ function bottleMatchesFilters(bottle, customer) {
   if (!matchesFreeword(f.freeword, customer.name, customer.kana, bottle.bottleName, bottle.bottleNameKana, customer.memo)) return false;
   if (f.bottleType && bottle.bottleType !== f.bottleType) return false;
   if (f.bottleNo && String(bottle.bottleNo) !== String(f.bottleNo).trim()) return false;
-  if (f.yearMonth && BKUtil.toYearMonth(bottle.lastVisitDate) !== f.yearMonth) return false;
+  if (!matchesLastVisitFilter(bottle.lastVisitDate, f.yearMonth)) return false;
   if (f.star === 'true' && !customer.star) return false;
   if (f.star === 'false' && customer.star) return false;
   if (f.status) {
@@ -1715,6 +1736,13 @@ function renderDisposalTargetScreen(root) {
   renderDisposalTargetBody(root);
 }
 
+function bottleGroupKey(bottle) {
+  if (bottle.bottleType === OTHER_UNLABELED_TAB) {
+    return (bottle.bottleName && bottle.bottleName.trim()) ? OTHER_TAB_PREFIX + bottle.bottleName.trim() : OTHER_UNLABELED_TAB;
+  }
+  return bottle.bottleType;
+}
+
 function renderDisposalTargetBody(root) {
   const baseTargets = APP.bottles
     .filter((b) => b.status === 'active')
@@ -1725,12 +1753,25 @@ function renderDisposalTargetBody(root) {
     .filter(({ bottle }) => bottleMatchesTab(bottle, APP.disposalTab))
     .filter(({ bottle, customer }) => bottleMatchesFilters(bottle, customer));
 
-  const sortDir = APP.sort.disposalTarget?.dir || 'desc';
-  list = [...list].sort((a, b) => {
-    const da = BKUtil.diffDays(a.bottle.lastVisitDate, BKUtil.todayJST());
-    const db = BKUtil.diffDays(b.bottle.lastVisitDate, BKUtil.todayJST());
-    return sortDir === 'asc' ? da - db : db - da;
-  });
+  const sortState = APP.sort.disposalTarget;
+  if (sortState && sortState.key === 'elapsedDays') {
+    const sortDir = sortState.dir || 'desc';
+    list = [...list].sort((a, b) => {
+      const da = BKUtil.diffDays(a.bottle.lastVisitDate, BKUtil.todayJST());
+      const db = BKUtil.diffDays(b.bottle.lastVisitDate, BKUtil.todayJST());
+      return sortDir === 'asc' ? da - db : db - da;
+    });
+  } else {
+    // デフォルトの並び順：銘柄ごとにまとめてから、その中でボトルNo.の若い順にする
+    // （「すべて」表示の時に色々な銘柄がごちゃまぜにならないように）
+    const groupOrder = effectiveTypeTabs().map((t) => t.key);
+    list = [...list].sort((a, b) => {
+      const ga = groupOrder.indexOf(bottleGroupKey(a.bottle));
+      const gb = groupOrder.indexOf(bottleGroupKey(b.bottle));
+      if (ga !== gb) return ga - gb;
+      return a.bottle.bottleNo - b.bottle.bottleNo;
+    });
+  }
 
   const body = root.querySelector('#dt-body');
   root.querySelector('#dt-count').textContent = `${list.length}件`;
@@ -1748,8 +1789,8 @@ function renderDisposalTargetBody(root) {
           <col style="width:26%"><col style="width:104px"><col style="width:70px"><col style="width:40%"><col style="width:130px"><col style="width:130px">
         </colgroup>
         <thead><tr>
-          <th>ボトル・お客様</th>
-          <th>最終来店日</th><th data-sort="elapsedDays" class="${APP.sort.disposalTarget?.key === 'elapsedDays' ? 'sort-active' : ''}">経過日数 ${sortDir === 'asc' ? '▲' : '▼'}</th>
+          <th data-sort="bottleNo" class="${!sortState || sortState.key !== 'elapsedDays' ? 'sort-active' : ''}">ボトル・お客様</th>
+          <th>最終来店日</th><th data-sort="elapsedDays" class="${sortState?.key === 'elapsedDays' ? 'sort-active' : ''}">経過日数 ${sortState?.key === 'elapsedDays' ? (sortState.dir === 'asc' ? '▲' : '▼') : ''}</th>
           <th>特徴・注意事項</th><th>残量</th><th>操作</th>
         </tr></thead>
         <tbody>
@@ -1788,6 +1829,13 @@ function renderDisposalTargetBody(root) {
     sortHeader.addEventListener('click', () => {
       const cur = APP.sort.disposalTarget || {};
       APP.sort.disposalTarget = { key: 'elapsedDays', dir: cur.key === 'elapsedDays' && cur.dir === 'desc' ? 'asc' : 'desc' };
+      renderDisposalTargetBody(root);
+    });
+  }
+  const bottleNoHeader = body.querySelector('[data-sort="bottleNo"]');
+  if (bottleNoHeader) {
+    bottleNoHeader.addEventListener('click', () => {
+      APP.sort.disposalTarget = null;
       renderDisposalTargetBody(root);
     });
   }
@@ -1956,7 +2004,7 @@ function renderDisposalHistoryBody(root) {
     if (!matchesFreeword(f.freeword, h.customerNameSnapshot, h.customerKanaSnapshot, h.bottleNameSnapshot, h.bottleNameKanaSnapshot, h.memo)) return false;
     if (f.bottleType && h.bottleType !== f.bottleType) return false;
     if (f.bottleNo && String(h.originalBottleNo) !== String(f.bottleNo).trim()) return false;
-    if (f.yearMonth && BKUtil.toYearMonth(BKUtil.jstDateFromISO(h.disposedAt)) !== f.yearMonth) return false;
+    if (!matchesLastVisitFilter(BKUtil.jstDateFromISO(h.disposedAt), f.yearMonth)) return false;
     return true;
   });
   list.sort((a, b) => (a.disposedAt < b.disposedAt ? 1 : -1));
