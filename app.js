@@ -1783,6 +1783,11 @@ function renderDisposalTargetBody(root) {
         return `<div class="tab-bar__item ${APP.disposalTab === key ? 'is-active' : ''}" data-tab="${escapeHtml(key)}">${escapeHtml(label)}（${cnt}）</div>`;
       }).join('')}
     </div>
+    <div class="flex-row" style="align-items:center; gap:8px; margin:10px 0; flex-wrap:wrap;">
+      <span class="text-muted" style="font-size:13px;">並び替え：</span>
+      <button class="btn btn-sm ${!sortState ? 'btn-primary' : 'btn-ghost'}" data-sortbtn="default">番号順</button>
+      <button class="btn btn-sm ${sortState?.key === 'elapsedDays' ? 'btn-primary' : 'btn-ghost'}" data-sortbtn="elapsedDays">最終来店日が古い順</button>
+    </div>
     <div class="table-wrap is-cardable">
       <table class="data-table data-table--fixed">
         <colgroup>
@@ -1839,6 +1844,13 @@ function renderDisposalTargetBody(root) {
       renderDisposalTargetBody(root);
     });
   }
+
+  body.querySelectorAll('[data-sortbtn]').forEach((el) => {
+    el.addEventListener('click', () => {
+      APP.sort.disposalTarget = el.dataset.sortbtn === 'elapsedDays' ? { key: 'elapsedDays', dir: 'desc' } : null;
+      renderDisposalTargetBody(root);
+    });
+  });
 
   body.querySelectorAll('[data-tab]').forEach((el) => {
     el.addEventListener('click', () => {
