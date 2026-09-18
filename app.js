@@ -2342,7 +2342,10 @@ async function loadAndRenderStaffReview(root) {
               <tr>
                 <td data-label="ボトル・お客様">${bottleTagHtml(bottle)}<br>${escapeHtml(customer.name)}</td>
                 <td class="text-muted" data-label="コメント">${comments.map((c) => `${escapeHtml(c.comment)}（${escapeHtml(c.nickname)}）`).join('<br>')}</td>
-                <td data-label="操作"><button class="btn btn-sm btn-ghost" data-review-bottle="${bottle.id}">修正画面へ</button></td>
+                <td data-label="操作">
+                  <button class="btn btn-sm btn-primary" data-quick-star="${customer.id}">★にする</button>
+                  <button class="btn btn-sm btn-ghost" data-review-bottle="${bottle.id}">修正画面へ</button>
+                </td>
               </tr>
             `).join('')}
             </tbody>
@@ -2372,6 +2375,12 @@ async function loadAndRenderStaffReview(root) {
       APP.detailBottleId = el.dataset.reviewBottle;
       APP.detailMode = 'edit';
       renderScreen('detail');
+    });
+  });
+  body.querySelectorAll('[data-quick-star]').forEach((el) => {
+    el.addEventListener('click', async () => {
+      await applyStarToCustomers([el.dataset.quickStar]);
+      renderStaffReviewScreen(root);
     });
   });
 }
