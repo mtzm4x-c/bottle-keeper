@@ -1754,7 +1754,11 @@ function buildDisposalTargetText(list) {
     groups.get(key).push(item);
   }
 
-  const orderedKeys = [...groups.keys()].sort((a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b));
+  const orderedKeys = [...groups.keys()].sort((a, b) => {
+    const ia = groupOrder.indexOf(a);
+    const ib = groupOrder.indexOf(b);
+    return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+  });
   return orderedKeys.map((key) => {
     const label = labelByKey.get(key) || key;
     const lines = groups.get(key).map(({ bottle, customer }) => {
@@ -2233,6 +2237,7 @@ function parseDisposalCheckRows(records) {
       customerName: r[7] || '',
       keep: r[8] === true || r[8] === 'TRUE',
       comment: r[9] || '',
+      id: r[10] || '',
     }))
     .filter((r) => r.bottleId);
 }
@@ -2240,6 +2245,11 @@ function parseDisposalCheckRows(records) {
 async function fetchDisposalCheckResponses() {
   const records = await fetchSheetTableViaGviz(BUILT_IN_SPREADSHEET_ID, DISCARD_CHECK_SHEET_NAME);
   return parseDisposalCheckRows(records);
+}
+
+// 回答履歴の1件を、共有スプレッドシート側からも削除する（Code.gs側のhandleDisposalCheckDeleteが対応）
+async function deleteDisposalCheckResponse(responseId) {
+  await submitViaHiddenForm(getSheetSyncUrl(), JSON.stringify({ type: 'deleteDisposalCheckResponse', responseId }));
 }
 
 // bottleIdごとに回答をまとめる。keepが1件でもあれば「残す候補」、コメントのみなら「要確認」に分類する。
@@ -2259,10 +2269,11 @@ function groupDisposalCheckResponses(responses) {
     if (!customer || customer.star) continue; // 既に★済み＝解決済みとして表示しない
     const anyKeep = entries.some((e) => e.keep);
     const comments = entries.filter((e) => e.comment).map((e) => ({ nickname: e.nickname, comment: e.comment, submittedAt: e.submittedAt }));
-    if (anyKeep) {
-      keepCandidates.push({ bottle, customer, comments });
-    } else if (comments.length > 0) {
+    // コメントが1件でもあれば、チェックの有無に関わらず「要確認」（個別に判断してほしいため）
+    if (comments.length > 0) {
       needsReview.push({ bottle, customer, comments });
+    } else if (anyKeep) {
+      keepCandidates.push({ bottle, customer, comments });
     }
   }
   const groupOrder = effectiveTypeTabs().map((t) => t.key);
@@ -2403,7 +2414,7 @@ async function loadAndRenderResponseHistory(root) {
     <div class="table-wrap is-cardable">
       <table class="data-table">
         <thead><tr>
-          <th>日時</th><th>ニックネーム</th><th>ボトル</th><th>チェック</th><th>コメント</th><th>デバイス</th>
+          <th>日時</th><th>ニックネーム</th><th>ボトル</th><th>チェック</th><th>コメント</th><th>デバイス</th><th>操作</th>
         </tr></thead>
         <tbody>
         ${responses.map((r) => `
@@ -2414,6 +2425,7 @@ async function loadAndRenderResponseHistory(root) {
             <td data-label="チェック">${r.keep ? '○' : '×'}</td>
             <td class="text-muted" data-label="コメント">${escapeHtml(r.comment)}</td>
             <td data-label="デバイス">${escapeHtml(r.device)}</td>
+            <td data-label="操作">${r.id ? `<button class="btn btn-sm btn-ghost" data-delete-response="${escapeHtml(r.id)}">削除</button>` : '<span class="text-faint">-</span>'}</td>
           </tr>
         `).join('')}
         </tbody>
@@ -2421,6 +2433,26 @@ async function loadAndRenderResponseHistory(root) {
       ${responses.length === 0 ? '<div class="empty-state">まだ回答がありません</div>' : ''}
     </div>
   `;
+
+  body.querySelectorAll('[data-delete-response]').forEach((el) => {
+    el.addEventListener('click', () => confirmDeleteDisposalCheckResponse(el.dataset.deleteResponse, root));
+  });
+}
+
+function confirmDeleteDisposalCheckResponse(responseId, root) {
+  const bodyHtml = '<p>この回答を削除します。よろしいですか？（元に戻せません）</p>';
+  const actions = `
+    <button class="btn btn-ghost" id="m-cancel">キャンセル</button>
+    <button class="btn btn-danger" id="m-confirm">削除する</button>
+  `;
+  const box = openModal('回答の削除', bodyHtml, actions);
+  box.querySelector('#m-cancel').addEventListener('click', closeModal);
+  box.querySelector('#m-confirm').addEventListener('click', async () => {
+    closeModal();
+    await deleteDisposalCheckResponse(responseId);
+    showToast('削除しました');
+    loadAndRenderResponseHistory(root);
+  });
 }
 
 // ==========================================================================

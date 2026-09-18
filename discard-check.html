@@ -66,6 +66,19 @@
   .empty-state, .status-msg { color: var(--color-muted); font-size: 14px; padding: 20px 4px; text-align: center; }
   .status-msg--error { color: var(--color-danger); }
   .submit-bar { position: sticky; bottom: 0; padding-top: 10px; background: var(--color-bg); }
+  .type-filter {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    background: var(--color-bg); padding: 8px 0; margin: 0 0 8px;
+    border-bottom: 1px solid var(--color-border-soft);
+  }
+  .type-filter::-webkit-scrollbar { display: none; }
+  .type-filter-btn {
+    flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: bold;
+    border-radius: 999px; border: 1px solid var(--color-border); background: var(--color-surface);
+    color: var(--color-text); cursor: pointer; white-space: nowrap;
+  }
+  .type-filter-btn.is-active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
   .done-screen { text-align: center; padding: 40px 16px; }
   .done-screen .icon { font-size: 40px; }
   .hidden { display: none !important; }
@@ -80,9 +93,10 @@
   <div class="card">
     <div class="field">
       <label>お名前（ニックネーム）<span style="color:var(--color-danger);">※必須</span></label>
-      <input type="text" id="nickname" placeholder="例：金宮">
+      <input type="text" id="nickname">
     </div>
   </div>
+  <div id="type-filter"></div>
   <div id="bottle-list"><div class="status-msg">読み込み中...</div></div>
   <div class="submit-bar hidden" id="submit-bar">
     <button class="btn btn-primary btn-wide" id="submit-btn">送信する</button>
@@ -95,7 +109,7 @@
   <button class="btn" id="restart-btn">もう一度回答する</button>
 </div>
 
-<script src="utils.js?v=79"></script>
+<script src="utils.js?v=80"></script>
 <script>
 // app.js と同じ値（同じ共有スプレッドシート・同じApps Script Web App）を参照する。
 // スプレッドシートを作り直した場合は、app.js側と一緒にこちらも書き換えること。
@@ -202,6 +216,9 @@ function submitViaHiddenForm(url, payloadJson) {
 }
 
 let disposalTargets = [];
+let disposalGroups = new Map();
+let currentTypeFilter = 'ALL';
+const responseState = new Map(); // bottleId -> { keep, comment }
 
 async function loadDisposalTargets() {
   const listEl = document.getElementById('bottle-list');
@@ -248,30 +265,76 @@ async function loadDisposalTargets() {
     return;
   }
 
-  const groups = new Map();
+  disposalGroups = new Map();
   for (const item of disposalTargets) {
     const key = item.bottle.bottleType || 'その他';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(item);
+    if (!disposalGroups.has(key)) disposalGroups.set(key, []);
+    disposalGroups.get(key).push(item);
   }
 
+  renderTypeFilter();
+  renderBottleList();
+  document.getElementById('submit-bar').classList.remove('hidden');
+}
+
+function renderTypeFilter() {
+  const filterEl = document.getElementById('type-filter');
+  const buttons = [`<button class="type-filter-btn ${currentTypeFilter === 'ALL' ? 'is-active' : ''}" data-filter="ALL">すべて（${disposalTargets.length}）</button>`];
+  for (const [type, items] of disposalGroups) {
+    buttons.push(`<button class="type-filter-btn ${currentTypeFilter === type ? 'is-active' : ''}" data-filter="${escapeHtml(type)}">${escapeHtml(type)}（${items.length}）</button>`);
+  }
+  filterEl.innerHTML = buttons.join('');
+  filterEl.querySelectorAll('[data-filter]').forEach((el) => {
+    el.addEventListener('click', () => {
+      currentTypeFilter = el.dataset.filter;
+      renderTypeFilter();
+      renderBottleList();
+    });
+  });
+}
+
+function renderBottleList() {
+  const listEl = document.getElementById('bottle-list');
+  const typesToShow = currentTypeFilter === 'ALL' ? [...disposalGroups.keys()] : [currentTypeFilter];
+
   let html = '';
-  for (const [type, items] of groups) {
+  for (const type of typesToShow) {
+    const items = disposalGroups.get(type) || [];
     html += `<div class="group-title">${escapeHtml(type)}（${items.length}）</div><div class="card">`;
-    html += items.map(({ bottle, customer }) => `
+    html += items.map(({ bottle, customer }) => {
+      const state = responseState.get(bottle.id) || {};
+      return `
       <div class="bottle-row">
-        <input type="checkbox" class="keep-check" data-bottle="${bottle.id}">
+        <input type="checkbox" class="keep-check" data-bottle="${bottle.id}" ${state.keep ? 'checked' : ''}>
         <div class="info">
           <div class="name">${escapeHtml(customer.name)}</div>
           <div class="no">No.${bottle.bottleNo}${bottle.bottleName ? `　${escapeHtml(bottle.bottleName)}` : ''}</div>
-          <input type="text" class="comment" data-bottle="${bottle.id}" placeholder="コメント（任意）">
+          <input type="text" class="comment" data-bottle="${bottle.id}" placeholder="コメント（任意）" value="${escapeHtml(state.comment || '')}">
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
     html += '</div>';
   }
   listEl.innerHTML = html;
-  document.getElementById('submit-bar').classList.remove('hidden');
+
+  // 状態はDOMではなくresponseStateで一元管理する（銘柄フィルタの切り替えで表示外になった項目も保持するため）
+  listEl.querySelectorAll('.keep-check').forEach((el) => {
+    el.addEventListener('change', () => {
+      const bottleId = el.dataset.bottle;
+      const state = responseState.get(bottleId) || {};
+      state.keep = el.checked;
+      responseState.set(bottleId, state);
+    });
+  });
+  listEl.querySelectorAll('.comment').forEach((el) => {
+    el.addEventListener('input', () => {
+      const bottleId = el.dataset.bottle;
+      const state = responseState.get(bottleId) || {};
+      state.comment = el.value;
+      responseState.set(bottleId, state);
+    });
+  });
 }
 
 async function handleSubmit() {
@@ -282,12 +345,12 @@ async function handleSubmit() {
   }
   const items = [];
   disposalTargets.forEach(({ bottle, customer }) => {
-    const checkEl = document.querySelector(`.keep-check[data-bottle="${bottle.id}"]`);
-    const commentEl = document.querySelector(`.comment[data-bottle="${bottle.id}"]`);
-    const keep = checkEl ? checkEl.checked : false;
-    const comment = commentEl ? commentEl.value.trim() : '';
+    const state = responseState.get(bottle.id) || {};
+    const keep = !!state.keep;
+    const comment = (state.comment || '').trim();
     if (!keep && !comment) return; // チェックもコメントも無い行は送信しない
     items.push({
+      id: BKUtil.uuid(),
       bottleId: bottle.id,
       bottleNo: bottle.bottleNo,
       bottleType: bottle.bottleType,
@@ -320,8 +383,8 @@ document.getElementById('restart-btn').addEventListener('click', () => {
   document.getElementById('done-screen').classList.add('hidden');
   document.getElementById('form-area').classList.remove('hidden');
   document.getElementById('nickname').value = '';
-  document.querySelectorAll('.keep-check').forEach((el) => { el.checked = false; });
-  document.querySelectorAll('.comment').forEach((el) => { el.value = ''; });
+  responseState.clear();
+  renderBottleList();
   const submitBtn = document.getElementById('submit-btn');
   submitBtn.disabled = false;
   submitBtn.textContent = '送信する';
