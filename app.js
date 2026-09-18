@@ -2254,6 +2254,9 @@ async function deleteDisposalCheckResponse(responseId) {
 
 // bottleIdごとに回答をまとめる。keepが1件でもあれば「残す候補」、コメントのみなら「要確認」に分類する。
 // すでに★済み・破棄済みになっているボトルは解決済みとみなして除外する（Code.gs側に処理済みフラグは持たせない）。
+// 「要確認」から「残す候補」へ手動で移動した回答（bottleId）。画面を開き直すとリセットされる一時的な状態。
+let staffReviewPromotedBottleIds = new Set();
+
 function groupDisposalCheckResponses(responses) {
   const byBottle = new Map();
   for (const r of responses) {
@@ -2268,11 +2271,15 @@ function groupDisposalCheckResponses(responses) {
     const customer = getCustomer(bottle.customerId);
     if (!customer || customer.star) continue; // 既に★済み＝解決済みとして表示しない
     const anyKeep = entries.some((e) => e.keep);
-    const comments = entries.filter((e) => e.comment).map((e) => ({ nickname: e.nickname, comment: e.comment, submittedAt: e.submittedAt }));
-    // コメントが1件でもあれば、チェックの有無に関わらず「要確認」（個別に判断してほしいため）
-    if (comments.length > 0) {
+    const comments = entries
+      .filter((e) => e.comment)
+      .map((e) => ({ nickname: e.nickname, comment: e.comment, submittedAt: e.submittedAt }));
+    const promoted = staffReviewPromotedBottleIds.has(bottleId);
+    // コメントが1件でもあれば、チェックの有無に関わらず「要確認」（個別に判断してほしいため）。
+    // ただし「残す候補に移動」で手動移動された場合はそちらを優先する。
+    if (comments.length > 0 && !promoted) {
       needsReview.push({ bottle, customer, comments });
-    } else if (anyKeep) {
+    } else if (anyKeep || promoted) {
       keepCandidates.push({ bottle, customer, comments });
     }
   }
@@ -2288,7 +2295,16 @@ function groupDisposalCheckResponses(responses) {
   return { keepCandidates, needsReview };
 }
 
+function commentsHtml(comments) {
+  if (comments.length === 0) return '<span class="text-faint">-</span>';
+  return comments.map((c) => `
+    ${escapeHtml(c.comment)}<br>
+    <span class="text-faint" style="font-size:11px;">${escapeHtml(c.nickname)}・${c.submittedAt ? new Date(c.submittedAt).toLocaleString('ja-JP') : ''}</span>
+  `).join('<hr style="border:none; border-top:1px solid var(--color-border-soft); margin:6px 0;">');
+}
+
 function renderStaffReviewScreen(root) {
+  staffReviewPromotedBottleIds = new Set();
   root.innerHTML = `
     <h2 class="screen-title">確認結果</h2>
     <p class="text-muted">スタッフが確認ページで送信した内容です。「残す候補」はチェックを入れて一括で★にできます。「要確認」はコメントのみのため、修正画面で個別に判断してください。</p>
@@ -2306,83 +2322,90 @@ async function loadAndRenderStaffReview(root) {
     body.innerHTML = `<div class="empty-state">読み込みに失敗しました（${escapeHtml(err && err.message ? err.message : String(err))}）</div>`;
     return;
   }
-  const { keepCandidates, needsReview } = groupDisposalCheckResponses(responses);
 
-  body.innerHTML = `
-    <div class="panel">
-      <h3 class="mt-0">残す候補 <span class="count-badge">${keepCandidates.length}件</span></h3>
-      ${keepCandidates.length === 0 ? '<div class="empty-state">現在、残す候補はありません</div>' : `
-        <div class="table-wrap is-cardable">
-          <table class="data-table">
-            <thead><tr><th style="width:40px;"><input type="checkbox" id="sr-check-all" checked></th><th>ボトル・お客様</th><th>コメント</th></tr></thead>
-            <tbody>
-            ${keepCandidates.map(({ bottle, customer, comments }) => `
-              <tr>
-                <td><input type="checkbox" class="sr-keep-check" data-customer="${customer.id}" checked></td>
-                <td data-label="ボトル・お客様">${bottleTagHtml(bottle)}<br>${escapeHtml(customer.name)}</td>
-                <td class="text-muted" data-label="コメント">${comments.map((c) => `${escapeHtml(c.comment)}（${escapeHtml(c.nickname)}）`).join('<br>')}</td>
-              </tr>
-            `).join('')}
-            </tbody>
-          </table>
-        </div>
-        <div class="flex-row" style="margin-top:10px;">
-          <button class="btn btn-primary" id="sr-apply-star">選択した項目を★にする</button>
-        </div>
-      `}
-    </div>
-    <div class="panel">
-      <h3 class="mt-0">要確認 <span class="count-badge">${needsReview.length}件</span></h3>
-      ${needsReview.length === 0 ? '<div class="empty-state">現在、要確認の項目はありません</div>' : `
-        <div class="table-wrap is-cardable">
-          <table class="data-table">
-            <thead><tr><th>ボトル・お客様</th><th>コメント</th><th>操作</th></tr></thead>
-            <tbody>
-            ${needsReview.map(({ bottle, customer, comments }) => `
-              <tr>
-                <td data-label="ボトル・お客様">${bottleTagHtml(bottle)}<br>${escapeHtml(customer.name)}</td>
-                <td class="text-muted" data-label="コメント">${comments.map((c) => `${escapeHtml(c.comment)}（${escapeHtml(c.nickname)}）`).join('<br>')}</td>
-                <td data-label="操作">
-                  <button class="btn btn-sm btn-primary" data-quick-star="${customer.id}">★にする</button>
-                  <button class="btn btn-sm btn-ghost" data-review-bottle="${bottle.id}">修正画面へ</button>
-                </td>
-              </tr>
-            `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `}
-    </div>
-  `;
+  function renderBody() {
+    const { keepCandidates, needsReview } = groupDisposalCheckResponses(responses);
 
-  const checkAll = body.querySelector('#sr-check-all');
-  if (checkAll) {
-    checkAll.addEventListener('change', () => {
-      body.querySelectorAll('.sr-keep-check').forEach((el) => { el.checked = checkAll.checked; });
+    body.innerHTML = `
+      <div class="panel">
+        <h3 class="mt-0">残す候補 <span class="count-badge">${keepCandidates.length}件</span></h3>
+        ${keepCandidates.length === 0 ? '<div class="empty-state">現在、残す候補はありません</div>' : `
+          <div class="table-wrap is-cardable">
+            <table class="data-table">
+              <thead><tr><th style="width:40px;"><input type="checkbox" id="sr-check-all" checked></th><th>ボトル・お客様</th><th>特徴</th><th>コメント</th></tr></thead>
+              <tbody>
+              ${keepCandidates.map(({ bottle, customer, comments }) => `
+                <tr>
+                  <td><input type="checkbox" class="sr-keep-check" data-customer="${customer.id}" checked></td>
+                  <td data-label="ボトル・お客様">${bottleTagHtml(bottle)}<br>${escapeHtml(customer.name)}</td>
+                  <td class="text-muted" data-label="特徴">${escapeHtml(customer.memo) || '<span class="text-faint">-</span>'}</td>
+                  <td class="text-muted" data-label="コメント">${commentsHtml(comments)}</td>
+                </tr>
+              `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="flex-row" style="margin-top:10px;">
+            <button class="btn btn-primary" id="sr-apply-star">選択した項目を★にする</button>
+          </div>
+        `}
+      </div>
+      <div class="panel">
+        <h3 class="mt-0">要確認 <span class="count-badge">${needsReview.length}件</span></h3>
+        ${needsReview.length === 0 ? '<div class="empty-state">現在、要確認の項目はありません</div>' : `
+          <div class="table-wrap is-cardable">
+            <table class="data-table">
+              <thead><tr><th>ボトル・お客様</th><th>特徴</th><th>コメント</th><th>操作</th></tr></thead>
+              <tbody>
+              ${needsReview.map(({ bottle, customer, comments }) => `
+                <tr>
+                  <td data-label="ボトル・お客様">${bottleTagHtml(bottle)}<br>${escapeHtml(customer.name)}</td>
+                  <td class="text-muted" data-label="特徴">${escapeHtml(customer.memo) || '<span class="text-faint">-</span>'}</td>
+                  <td class="text-muted" data-label="コメント">${commentsHtml(comments)}</td>
+                  <td data-label="操作">
+                    <button class="btn btn-sm btn-primary" data-promote="${bottle.id}">残す候補に移動</button>
+                    <button class="btn btn-sm btn-ghost" data-review-bottle="${bottle.id}">修正画面へ</button>
+                  </td>
+                </tr>
+              `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    `;
+
+    const checkAll = body.querySelector('#sr-check-all');
+    if (checkAll) {
+      checkAll.addEventListener('change', () => {
+        body.querySelectorAll('.sr-keep-check').forEach((el) => { el.checked = checkAll.checked; });
+      });
+    }
+    const applyBtn = body.querySelector('#sr-apply-star');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', async () => {
+        const customerIds = [...body.querySelectorAll('.sr-keep-check:checked')].map((el) => el.dataset.customer);
+        if (customerIds.length === 0) { showToast('選択されていません', 'error'); return; }
+        await applyStarToCustomers(customerIds);
+        renderBody();
+      });
+    }
+    body.querySelectorAll('[data-review-bottle]').forEach((el) => {
+      el.addEventListener('click', () => {
+        APP.detailBottleId = el.dataset.reviewBottle;
+        APP.detailMode = 'edit';
+        renderScreen('detail');
+      });
+    });
+    body.querySelectorAll('[data-promote]').forEach((el) => {
+      el.addEventListener('click', () => {
+        staffReviewPromotedBottleIds.add(el.dataset.promote);
+        renderBody();
+      });
     });
   }
-  const applyBtn = body.querySelector('#sr-apply-star');
-  if (applyBtn) {
-    applyBtn.addEventListener('click', async () => {
-      const customerIds = [...body.querySelectorAll('.sr-keep-check:checked')].map((el) => el.dataset.customer);
-      if (customerIds.length === 0) { showToast('選択されていません', 'error'); return; }
-      await applyStarToCustomers(customerIds);
-      renderStaffReviewScreen(root);
-    });
-  }
-  body.querySelectorAll('[data-review-bottle]').forEach((el) => {
-    el.addEventListener('click', () => {
-      APP.detailBottleId = el.dataset.reviewBottle;
-      APP.detailMode = 'edit';
-      renderScreen('detail');
-    });
-  });
-  body.querySelectorAll('[data-quick-star]').forEach((el) => {
-    el.addEventListener('click', async () => {
-      await applyStarToCustomers([el.dataset.quickStar]);
-      renderStaffReviewScreen(root);
-    });
-  });
+
+  renderBody();
 }
 
 async function applyStarToCustomers(customerIds) {
