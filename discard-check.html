@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>破棄対象チェック - Bottle Keeper</title>
+<link rel="icon" href="icon.png">
+<style>
+  :root {
+    --color-bg: #F4F7F8;
+    --color-surface: #FFFFFF;
+    --color-border: #C9D2D7;
+    --color-border-soft: #DDE4E7;
+    --color-text: #24343B;
+    --color-muted: #6B7B82;
+    --color-primary: #2E6F7E;
+    --color-primary-dark: #1F5461;
+    --color-danger: #C0453A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    padding: 16px;
+    padding-bottom: 80px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .lead { color: var(--color-muted); font-size: 13px; margin: 0 0 16px; line-height: 1.6; }
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-soft);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+  .field input[type="text"] {
+    width: 100%; padding: 10px; font-size: 15px;
+    border: 1px solid var(--color-border); border-radius: 6px;
+  }
+  .group-title {
+    font-size: 14px; font-weight: bold; margin: 18px 0 8px;
+    padding-bottom: 4px; border-bottom: 2px solid var(--color-border-soft);
+  }
+  .bottle-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--color-border-soft); }
+  .bottle-row:last-child { border-bottom: none; }
+  .bottle-row input[type="checkbox"] { width: 22px; height: 22px; margin-top: 2px; flex-shrink: 0; }
+  .bottle-row .info { flex: 1; min-width: 0; }
+  .bottle-row .name { font-size: 15px; }
+  .bottle-row .no { color: var(--color-muted); font-size: 12px; }
+  .bottle-row input[type="text"].comment {
+    width: 100%; margin-top: 6px; padding: 7px 8px; font-size: 13px;
+    border: 1px solid var(--color-border); border-radius: 6px;
+  }
+  .btn {
+    display: inline-block; padding: 12px 20px; font-size: 15px; font-weight: bold;
+    border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface);
+    color: var(--color-text); cursor: pointer;
+  }
+  .btn-primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .btn-primary:active { background: var(--color-primary-dark); }
+  .btn-wide { width: 100%; }
+  .empty-state, .status-msg { color: var(--color-muted); font-size: 14px; padding: 20px 4px; text-align: center; }
+  .status-msg--error { color: var(--color-danger); }
+  .submit-bar { position: sticky; bottom: 0; padding-top: 10px; background: var(--color-bg); }
+  .done-screen { text-align: center; padding: 40px 16px; }
+  .done-screen .icon { font-size: 40px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<h1>🍾 破棄対象チェック</h1>
+<p class="lead">残しておきたいボトルにチェックを入れてください。気になる点があれば、コメントだけでも構いません。</p>
+
+<div id="form-area">
+  <div class="card">
+    <div class="field">
+      <label>お名前（ニックネーム）<span style="color:var(--color-danger);">※必須</span></label>
+      <input type="text" id="nickname" placeholder="例：金宮">
+    </div>
+  </div>
+  <div id="bottle-list"><div class="status-msg">読み込み中...</div></div>
+  <div class="submit-bar hidden" id="submit-bar">
+    <button class="btn btn-primary btn-wide" id="submit-btn">送信する</button>
+  </div>
+</div>
+
+<div class="done-screen hidden" id="done-screen">
+  <div class="icon">✅</div>
+  <p>送信しました。ありがとうございました！</p>
+  <button class="btn" id="restart-btn">もう一度回答する</button>
+</div>
+
+<script src="utils.js?v=79"></script>
+<script>
+// app.js と同じ値（同じ共有スプレッドシート・同じApps Script Web App）を参照する。
+// スプレッドシートを作り直した場合は、app.js側と一緒にこちらも書き換えること。
+const SPREADSHEET_ID = '1wMGWhGP_eoVTexLiso93IlE2Ah5DWo-MdFh7y44lMfo';
+const SHEET_SYNC_URL = 'https://script.google.com/macros/s/AKfycbzepxMhLoipibJ6pIfJ-FZ2OM7SzlXB3TNa4l8CP2n70V34nm4Sm9gLBbPsiIZo5iDH/exec';
+const BOTTLE_TYPES = [
+  '金宮', '角', 'ホワイト', '吉四六', '赤霧島',
+  '茉莉花', 'ジェムソン', '宝', '白州', 'ミズナラ', '鍛高譚', 'その他',
+];
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
+
+function getDeviceLabel() {
+  const ua = navigator.userAgent || '';
+  let os = 'その他の端末';
+  if (/iPad/.test(ua)) os = 'iPad';
+  else if (/iPhone/.test(ua)) os = 'iPhone';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Macintosh/.test(ua)) os = 'Mac';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  let browser = '';
+  if (/CriOS/.test(ua)) browser = 'Chrome';
+  else if (/Chrome/.test(ua) && !/Edg/.test(ua)) browser = 'Chrome';
+  else if (/Safari/.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+  else if (/Firefox/.test(ua)) browser = 'Firefox';
+  else if (/Edg/.test(ua)) browser = 'Edge';
+  return browser ? `${os} / ${browser}` : os;
+}
+
+// app.js の fetchSheetColumnViaGviz と同じ方式（単一セルのJSON blobをJSONPで読む）
+function fetchSheetColumnViaGviz(sheetId, sheetName, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const callbackName = `bkCheckGviz_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+    const params = new URLSearchParams();
+    params.set('tqx', `out:json;responseHandler:${callbackName}`);
+    params.set('sheet', sheetName);
+    params.set('range', 'A:A');
+    params.set('headers', '0');
+    const scriptUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?${params.toString()}`;
+    const script = document.createElement('script');
+    let done = false;
+    function cleanup() {
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      clearTimeout(timer);
+    }
+    window[callbackName] = (resp) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      try {
+        const rows = (resp && resp.table && resp.table.rows) || [];
+        const combined = rows.map((r) => (r && r.c && r.c[0] && r.c[0].v) || '').join('');
+        resolve(combined || null);
+      } catch (e) { reject(e); }
+    };
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error('応答がありませんでした（タイムアウト）'));
+    }, timeoutMs);
+    script.onerror = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error('スクリプトの読み込みに失敗しました'));
+    };
+    script.src = scriptUrl;
+    document.head.appendChild(script);
+  });
+}
+
+// app.js の submitViaHiddenForm と同じ方式（隠しiframe + フォームPOST）
+function submitViaHiddenForm(url, payloadJson) {
+  return new Promise((resolve) => {
+    let iframe = document.getElementById('gas-sync-frame');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'gas-sync-frame';
+      iframe.name = 'gas-sync-frame';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+    form.target = 'gas-sync-frame';
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = payloadJson;
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+    setTimeout(resolve, 4000);
+  });
+}
+
+let disposalTargets = [];
+
+async function loadDisposalTargets() {
+  const listEl = document.getElementById('bottle-list');
+  let cellValue;
+  try {
+    cellValue = await fetchSheetColumnViaGviz(SPREADSHEET_ID, '_共有データ');
+  } catch (err) {
+    listEl.innerHTML = `<div class="status-msg status-msg--error">読み込みに失敗しました（${escapeHtml(err && err.message ? err.message : String(err))}）。時間をおいて開き直してください。</div>`;
+    return;
+  }
+  if (!cellValue) {
+    listEl.innerHTML = '<div class="status-msg status-msg--error">共有データがまだありません。管理者に確認してください。</div>';
+    return;
+  }
+  let data;
+  try {
+    data = JSON.parse(cellValue);
+  } catch (err) {
+    listEl.innerHTML = '<div class="status-msg status-msg--error">データの形式が正しくありませんでした。</div>';
+    return;
+  }
+  const customers = data.customers || [];
+  const bottles = data.bottles || [];
+  const thresholdMonths = (data.settings && data.settings.disposalThresholdMonths) || 3;
+  const getCustomer = (id) => customers.find((c) => c.id === id) || null;
+
+  disposalTargets = bottles
+    .filter((b) => b.status === 'active')
+    .map((b) => ({ bottle: b, customer: getCustomer(b.customerId) }))
+    .filter(({ bottle, customer }) => customer && !customer.star && BKUtil.isDisposalTarget(bottle.lastVisitDate, thresholdMonths));
+
+  disposalTargets.sort((a, b) => {
+    const ia = BOTTLE_TYPES.indexOf(a.bottle.bottleType);
+    const ib = BOTTLE_TYPES.indexOf(b.bottle.bottleType);
+    const ga = ia === -1 ? BOTTLE_TYPES.length : ia;
+    const gb = ib === -1 ? BOTTLE_TYPES.length : ib;
+    if (ga !== gb) return ga - gb;
+    return a.bottle.bottleNo - b.bottle.bottleNo;
+  });
+
+  if (disposalTargets.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">現在、破棄対象のボトルはありません</div>';
+    document.getElementById('submit-bar').classList.remove('hidden');
+    return;
+  }
+
+  const groups = new Map();
+  for (const item of disposalTargets) {
+    const key = item.bottle.bottleType || 'その他';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  let html = '';
+  for (const [type, items] of groups) {
+    html += `<div class="group-title">${escapeHtml(type)}（${items.length}）</div><div class="card">`;
+    html += items.map(({ bottle, customer }) => `
+      <div class="bottle-row">
+        <input type="checkbox" class="keep-check" data-bottle="${bottle.id}">
+        <div class="info">
+          <div class="name">${escapeHtml(customer.name)}</div>
+          <div class="no">No.${bottle.bottleNo}${bottle.bottleName ? `　${escapeHtml(bottle.bottleName)}` : ''}</div>
+          <input type="text" class="comment" data-bottle="${bottle.id}" placeholder="コメント（任意）">
+        </div>
+      </div>
+    `).join('');
+    html += '</div>';
+  }
+  listEl.innerHTML = html;
+  document.getElementById('submit-bar').classList.remove('hidden');
+}
+
+async function handleSubmit() {
+  const nickname = document.getElementById('nickname').value.trim();
+  if (!nickname) {
+    alert('お名前（ニックネーム）を入力してください');
+    return;
+  }
+  const items = [];
+  disposalTargets.forEach(({ bottle, customer }) => {
+    const checkEl = document.querySelector(`.keep-check[data-bottle="${bottle.id}"]`);
+    const commentEl = document.querySelector(`.comment[data-bottle="${bottle.id}"]`);
+    const keep = checkEl ? checkEl.checked : false;
+    const comment = commentEl ? commentEl.value.trim() : '';
+    if (!keep && !comment) return; // チェックもコメントも無い行は送信しない
+    items.push({
+      bottleId: bottle.id,
+      bottleNo: bottle.bottleNo,
+      bottleType: bottle.bottleType,
+      bottleName: bottle.bottleName || '',
+      customerName: customer.name,
+      keep,
+      comment,
+    });
+  });
+
+  const submitBtn = document.getElementById('submit-btn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = '送信中...';
+
+  const payload = {
+    type: 'disposalCheck',
+    submittedAt: new Date().toISOString(),
+    nickname,
+    device: getDeviceLabel(),
+    items,
+  };
+  await submitViaHiddenForm(SHEET_SYNC_URL, JSON.stringify(payload));
+
+  document.getElementById('form-area').classList.add('hidden');
+  document.getElementById('done-screen').classList.remove('hidden');
+}
+
+document.getElementById('submit-btn').addEventListener('click', handleSubmit);
+document.getElementById('restart-btn').addEventListener('click', () => {
+  document.getElementById('done-screen').classList.add('hidden');
+  document.getElementById('form-area').classList.remove('hidden');
+  document.getElementById('nickname').value = '';
+  document.querySelectorAll('.keep-check').forEach((el) => { el.checked = false; });
+  document.querySelectorAll('.comment').forEach((el) => { el.value = ''; });
+  const submitBtn = document.getElementById('submit-btn');
+  submitBtn.disabled = false;
+  submitBtn.textContent = '送信する';
+});
+
+loadDisposalTargets();
+</script>
+</body>
+</html>

@@ -63,6 +63,10 @@ const BUILT_IN_SHEET_SYNC_URL = 'https://script.google.com/macros/s/AKfycbzepxMh
 // 読み取り専用。スプレッドシート本体のID（「リンクを知っている人は閲覧可」に設定済みであること）。
 // Googleスプレッドシート公式のJSON書き出し機能（gviz）経由で読み取るため、ブラウザ間の相性問題を受けにくい。
 const BUILT_IN_SPREADSHEET_ID = '1wMGWhGP_eoVTexLiso93IlE2Ah5DWo-MdFh7y44lMfo';
+// スタッフ向け「破棄対象チェック」回答ページ（本体アプリとは別の独立ページ）のURL。LINE送信用にコピーする。
+const DISCARD_CHECK_PAGE_URL = 'https://mtzm4x-c.github.io/bottle-keeper/discard-check.html';
+// スタッフの回答が書き込まれるシートのタブ名（discard-check.html / Code.gs 側の handleDisposalCheckSubmit と一致させること）
+const DISCARD_CHECK_SHEET_NAME = '_破棄チェック回答';
 
 function getSheetSyncUrl() {
   return (APP.settings.sheetSyncUrl && APP.settings.sheetSyncUrl.trim()) || BUILT_IN_SHEET_SYNC_URL;
@@ -220,6 +224,8 @@ function renderScreen(screen) {
     case 'merge': return renderMergeScreen(root);
     case 'disposal-target': return renderDisposalTargetScreen(root);
     case 'disposal-history': return renderDisposalHistoryScreen(root);
+    case 'staff-review': return renderStaffReviewScreen(root);
+    case 'response-history': return renderResponseHistoryScreen(root);
     case 'backup': return renderBackupScreen(root);
     case 'detail': return renderDetailScreen(root);
     default: return renderAddScreen(root);
@@ -1737,15 +1743,29 @@ function renderDisposalTargetScreen(root) {
 }
 
 function buildDisposalTargetText(list) {
-  return list.map(({ bottle, customer }) => {
-    const memo = customer.memo && customer.memo.trim();
-    return `${bottle.bottleNo}:${customer.name}${memo ? `（※${memo}）` : ''}`;
-  }).join('\n');
+  const tabs = effectiveTypeTabs();
+  const labelByKey = new Map(tabs.map((t) => [t.key, t.label]));
+  const groupOrder = tabs.map((t) => t.key);
+
+  const groups = new Map();
+  for (const item of list) {
+    const key = bottleGroupKey(item.bottle);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  const orderedKeys = [...groups.keys()].sort((a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b));
+  return orderedKeys.map((key) => {
+    const label = labelByKey.get(key) || key;
+    const lines = groups.get(key).map(({ bottle, customer }) => {
+      const memo = customer.memo && customer.memo.trim();
+      return `${bottle.bottleNo}:${customer.name}${memo ? `（※${memo}）` : ''}`;
+    });
+    return `【${label}】\n${lines.join('\n')}`;
+  }).join('\n\n');
 }
 
-async function copyDisposalTargetText(list) {
-  const text = buildDisposalTargetText(list);
-  if (!text) { showToast('破棄対象のボトルがありません', 'warn'); return; }
+async function copyToClipboard(text, successMessage) {
   try {
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(text);
@@ -1760,10 +1780,18 @@ async function copyDisposalTargetText(list) {
       document.execCommand('copy');
       document.body.removeChild(ta);
     }
-    showToast(`${list.length}件をコピーしました`);
+    showToast(successMessage);
+    return true;
   } catch (e) {
     showToast('コピーに失敗しました', 'error');
+    return false;
   }
+}
+
+async function copyDisposalTargetText(list) {
+  const text = buildDisposalTargetText(list);
+  if (!text) { showToast('破棄対象のボトルがありません', 'warn'); return; }
+  await copyToClipboard(text, `${list.length}件をコピーしました`);
 }
 
 function bottleGroupKey(bottle) {
@@ -1818,6 +1846,7 @@ function renderDisposalTargetBody(root) {
       <button class="btn btn-sm ${!sortState ? 'btn-primary' : 'btn-ghost'}" data-sortbtn="default">番号順</button>
       <button class="btn btn-sm ${sortState?.key === 'elapsedDays' ? 'btn-primary' : 'btn-ghost'}" data-sortbtn="elapsedDays">最終来店日が古い順</button>
       <button class="btn btn-sm btn-ghost" id="dt-copy-btn" style="margin-left:auto;">📋 テキストをコピー</button>
+      <button class="btn btn-sm btn-ghost" id="dt-copy-link-btn">🔗 確認ページのURLをコピー</button>
     </div>
     <div class="table-wrap is-cardable">
       <table class="data-table data-table--fixed">
@@ -1892,6 +1921,8 @@ function renderDisposalTargetBody(root) {
   });
   const copyBtn = body.querySelector('#dt-copy-btn');
   if (copyBtn) copyBtn.addEventListener('click', () => copyDisposalTargetText(list));
+  const copyLinkBtn = body.querySelector('#dt-copy-link-btn');
+  if (copyLinkBtn) copyLinkBtn.addEventListener('click', () => copyToClipboard(DISCARD_CHECK_PAGE_URL, '確認ページのURLをコピーしました'));
   body.querySelectorAll('[data-customer-bottles]').forEach((el) => el.addEventListener('click', () => openCustomerBottlesModal(el.dataset.customerBottles)));
   body.querySelectorAll('[data-view]').forEach((el) => el.addEventListener('click', () => { APP.detailBottleId = el.dataset.view; APP.detailMode = 'edit'; renderScreen('detail'); }));
   body.querySelectorAll('[data-slider]').forEach((el) => {
@@ -2133,6 +2164,263 @@ async function restoreBottle(historyId) {
   await refreshCache();
   showToast(`${h.bottleType} No.${h.originalBottleNo} を復元しました`);
   renderScreen('disposal-history');
+}
+
+// ==========================================================================
+// 15.5 画面：スタッフ確認・回答履歴（discard-check.html からの回答を扱う）
+// ==========================================================================
+
+// gvizで指定シートを「複数列のテーブル」として読み取る（1行目をヘッダーとして扱う）。
+// fetchSheetColumnViaGviz は単一セルのJSON blob専用なので、こちらは新規の多列テーブル読み取り用。
+function fetchSheetTableViaGviz(sheetId, sheetName, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const callbackName = `bottleKeepGvizTable_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+    const params = new URLSearchParams();
+    params.set('tqx', `out:json;responseHandler:${callbackName}`);
+    params.set('sheet', sheetName);
+    params.set('headers', '1');
+    const scriptUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?${params.toString()}`;
+    const script = document.createElement('script');
+    let done = false;
+
+    function cleanup() {
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      clearTimeout(timer);
+    }
+    window[callbackName] = (resp) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      try {
+        // シートがまだ存在しない（一度もスタッフ回答が送信されていない）場合はエラー応答になるので、空配列として扱う
+        if (!resp || resp.status === 'error' || !resp.table) { resolve([]); return; }
+        const rows = resp.table.rows || [];
+        resolve(rows.map((r) => (r && r.c ? r.c.map((cell) => (cell ? cell.v : '')) : [])));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error('応答がありませんでした（タイムアウト）'));
+    }, timeoutMs);
+    script.onerror = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error('スクリプトの読み込みに失敗しました'));
+    };
+    script.src = scriptUrl;
+    document.head.appendChild(script);
+  });
+}
+
+// discard-check.html / Code.gs の handleDisposalCheckSubmit が書き込む列順と一致させること：
+// 送信日時, ニックネーム, デバイス, ボトルID, ボトル番号, 銘柄, ボトル名, お客様名, チェック, コメント
+function parseDisposalCheckRows(records) {
+  return records
+    .map((r) => ({
+      submittedAt: r[0] || '',
+      nickname: r[1] || '',
+      device: r[2] || '',
+      bottleId: r[3] || '',
+      bottleNo: r[4] || '',
+      bottleType: r[5] || '',
+      bottleName: r[6] || '',
+      customerName: r[7] || '',
+      keep: r[8] === true || r[8] === 'TRUE',
+      comment: r[9] || '',
+    }))
+    .filter((r) => r.bottleId);
+}
+
+async function fetchDisposalCheckResponses() {
+  const records = await fetchSheetTableViaGviz(BUILT_IN_SPREADSHEET_ID, DISCARD_CHECK_SHEET_NAME);
+  return parseDisposalCheckRows(records);
+}
+
+// bottleIdごとに回答をまとめる。keepが1件でもあれば「残す候補」、コメントのみなら「要確認」に分類する。
+// すでに★済み・破棄済みになっているボトルは解決済みとみなして除外する（Code.gs側に処理済みフラグは持たせない）。
+function groupDisposalCheckResponses(responses) {
+  const byBottle = new Map();
+  for (const r of responses) {
+    if (!byBottle.has(r.bottleId)) byBottle.set(r.bottleId, []);
+    byBottle.get(r.bottleId).push(r);
+  }
+  const keepCandidates = [];
+  const needsReview = [];
+  for (const [bottleId, entries] of byBottle) {
+    const bottle = APP.bottles.find((b) => b.id === bottleId);
+    if (!bottle || bottle.status !== 'active') continue;
+    const customer = getCustomer(bottle.customerId);
+    if (!customer || customer.star) continue; // 既に★済み＝解決済みとして表示しない
+    const anyKeep = entries.some((e) => e.keep);
+    const comments = entries.filter((e) => e.comment).map((e) => ({ nickname: e.nickname, comment: e.comment, submittedAt: e.submittedAt }));
+    if (anyKeep) {
+      keepCandidates.push({ bottle, customer, comments });
+    } else if (comments.length > 0) {
+      needsReview.push({ bottle, customer, comments });
+    }
+  }
+  const groupOrder = effectiveTypeTabs().map((t) => t.key);
+  const sortByGroupAndNo = (a, b) => {
+    const ga = groupOrder.indexOf(bottleGroupKey(a.bottle));
+    const gb = groupOrder.indexOf(bottleGroupKey(b.bottle));
+    if (ga !== gb) return ga - gb;
+    return a.bottle.bottleNo - b.bottle.bottleNo;
+  };
+  keepCandidates.sort(sortByGroupAndNo);
+  needsReview.sort(sortByGroupAndNo);
+  return { keepCandidates, needsReview };
+}
+
+function renderStaffReviewScreen(root) {
+  root.innerHTML = `
+    <h2 class="screen-title">確認結果</h2>
+    <p class="text-muted">スタッフが確認ページで送信した内容です。「残す候補」はチェックを入れて一括で★にできます。「要確認」はコメントのみのため、修正画面で個別に判断してください。</p>
+    <div id="sr-body"><div class="empty-state">読み込み中...</div></div>
+  `;
+  loadAndRenderStaffReview(root);
+}
+
+async function loadAndRenderStaffReview(root) {
+  const body = root.querySelector('#sr-body');
+  let responses;
+  try {
+    responses = await fetchDisposalCheckResponses();
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state">読み込みに失敗しました（${escapeHtml(err && err.message ? err.message : String(err))}）</div>`;
+    return;
+  }
+  const { keepCandidates, needsReview } = groupDisposalCheckResponses(responses);
+
+  body.innerHTML = `
+    <div class="panel">
+      <h3 class="mt-0">残す候補 <span class="count-badge">${keepCandidates.length}件</span></h3>
+      ${keepCandidates.length === 0 ? '<div class="empty-state">現在、残す候補はありません</div>' : `
+        <div class="table-wrap is-cardable">
+          <table class="data-table">
+            <thead><tr><th style="width:40px;"><input type="checkbox" id="sr-check-all" checked></th><th>ボトル・お客様</th><th>コメント</th></tr></thead>
+            <tbody>
+            ${keepCandidates.map(({ bottle, customer, comments }) => `
+              <tr>
+                <td><input type="checkbox" class="sr-keep-check" data-customer="${customer.id}" checked></td>
+                <td data-label="ボトル・お客様">${bottleTagHtml(bottle)}<br>${escapeHtml(customer.name)}</td>
+                <td class="text-muted" data-label="コメント">${comments.map((c) => `${escapeHtml(c.comment)}（${escapeHtml(c.nickname)}）`).join('<br>')}</td>
+              </tr>
+            `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="flex-row" style="margin-top:10px;">
+          <button class="btn btn-primary" id="sr-apply-star">選択した項目を★にする</button>
+        </div>
+      `}
+    </div>
+    <div class="panel">
+      <h3 class="mt-0">要確認 <span class="count-badge">${needsReview.length}件</span></h3>
+      ${needsReview.length === 0 ? '<div class="empty-state">現在、要確認の項目はありません</div>' : `
+        <div class="table-wrap is-cardable">
+          <table class="data-table">
+            <thead><tr><th>ボトル・お客様</th><th>コメント</th><th>操作</th></tr></thead>
+            <tbody>
+            ${needsReview.map(({ bottle, customer, comments }) => `
+              <tr>
+                <td data-label="ボトル・お客様">${bottleTagHtml(bottle)}<br>${escapeHtml(customer.name)}</td>
+                <td class="text-muted" data-label="コメント">${comments.map((c) => `${escapeHtml(c.comment)}（${escapeHtml(c.nickname)}）`).join('<br>')}</td>
+                <td data-label="操作"><button class="btn btn-sm btn-ghost" data-review-bottle="${bottle.id}">修正画面へ</button></td>
+              </tr>
+            `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `}
+    </div>
+  `;
+
+  const checkAll = body.querySelector('#sr-check-all');
+  if (checkAll) {
+    checkAll.addEventListener('change', () => {
+      body.querySelectorAll('.sr-keep-check').forEach((el) => { el.checked = checkAll.checked; });
+    });
+  }
+  const applyBtn = body.querySelector('#sr-apply-star');
+  if (applyBtn) {
+    applyBtn.addEventListener('click', async () => {
+      const customerIds = [...body.querySelectorAll('.sr-keep-check:checked')].map((el) => el.dataset.customer);
+      if (customerIds.length === 0) { showToast('選択されていません', 'error'); return; }
+      await applyStarToCustomers(customerIds);
+      renderStaffReviewScreen(root);
+    });
+  }
+  body.querySelectorAll('[data-review-bottle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      APP.detailBottleId = el.dataset.reviewBottle;
+      APP.detailMode = 'edit';
+      renderScreen('detail');
+    });
+  });
+}
+
+async function applyStarToCustomers(customerIds) {
+  const now = BKUtil.nowISO();
+  for (const id of customerIds) {
+    const customer = getCustomer(id);
+    if (!customer || customer.star) continue;
+    const before = { ...customer };
+    customer.star = true;
+    customer.updatedAt = now;
+    await APP.storage.putCustomer(customer);
+    await logOperation('★の変更', 'customer', customer.id, before, customer, 'スタッフ確認結果からの一括反映');
+  }
+  await refreshCache();
+  showToast(`${customerIds.length}件を★にしました`);
+}
+
+function renderResponseHistoryScreen(root) {
+  root.innerHTML = `
+    <h2 class="screen-title">回答履歴</h2>
+    <p class="text-muted">スタッフが確認ページで送信した内容の全履歴です。</p>
+    <div id="rh-body"><div class="empty-state">読み込み中...</div></div>
+  `;
+  loadAndRenderResponseHistory(root);
+}
+
+async function loadAndRenderResponseHistory(root) {
+  const body = root.querySelector('#rh-body');
+  let responses;
+  try {
+    responses = await fetchDisposalCheckResponses();
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state">読み込みに失敗しました（${escapeHtml(err && err.message ? err.message : String(err))}）</div>`;
+    return;
+  }
+  responses.sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1));
+  body.innerHTML = `
+    <div class="table-wrap is-cardable">
+      <table class="data-table">
+        <thead><tr>
+          <th>日時</th><th>ニックネーム</th><th>ボトル</th><th>チェック</th><th>コメント</th><th>デバイス</th>
+        </tr></thead>
+        <tbody>
+        ${responses.map((r) => `
+          <tr>
+            <td data-label="日時">${r.submittedAt ? new Date(r.submittedAt).toLocaleString('ja-JP') : ''}</td>
+            <td data-label="ニックネーム">${escapeHtml(r.nickname)}</td>
+            <td data-label="ボトル">${escapeHtml(r.bottleNo)}:${escapeHtml(r.customerName)}</td>
+            <td data-label="チェック">${r.keep ? '○' : '×'}</td>
+            <td class="text-muted" data-label="コメント">${escapeHtml(r.comment)}</td>
+            <td data-label="デバイス">${escapeHtml(r.device)}</td>
+          </tr>
+        `).join('')}
+        </tbody>
+      </table>
+      ${responses.length === 0 ? '<div class="empty-state">まだ回答がありません</div>' : ''}
+    </div>
+  `;
 }
 
 // ==========================================================================
