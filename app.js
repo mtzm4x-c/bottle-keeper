@@ -1736,6 +1736,36 @@ function renderDisposalTargetScreen(root) {
   renderDisposalTargetBody(root);
 }
 
+function buildDisposalTargetText(list) {
+  return list.map(({ bottle, customer }) => {
+    const memo = customer.memo && customer.memo.trim();
+    return `${bottle.bottleNo}:${customer.name}${memo ? `（※${memo}）` : ''}`;
+  }).join('\n');
+}
+
+async function copyDisposalTargetText(list) {
+  const text = buildDisposalTargetText(list);
+  if (!text) { showToast('破棄対象のボトルがありません', 'warn'); return; }
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showToast(`${list.length}件をコピーしました`);
+  } catch (e) {
+    showToast('コピーに失敗しました', 'error');
+  }
+}
+
 function bottleGroupKey(bottle) {
   if (bottle.bottleType === OTHER_UNLABELED_TAB) {
     return (bottle.bottleName && bottle.bottleName.trim()) ? OTHER_TAB_PREFIX + bottle.bottleName.trim() : OTHER_UNLABELED_TAB;
@@ -1787,6 +1817,7 @@ function renderDisposalTargetBody(root) {
       <span class="text-muted" style="font-size:13px;">並び替え：</span>
       <button class="btn btn-sm ${!sortState ? 'btn-primary' : 'btn-ghost'}" data-sortbtn="default">番号順</button>
       <button class="btn btn-sm ${sortState?.key === 'elapsedDays' ? 'btn-primary' : 'btn-ghost'}" data-sortbtn="elapsedDays">最終来店日が古い順</button>
+      <button class="btn btn-sm btn-ghost" id="dt-copy-btn" style="margin-left:auto;">📋 テキストをコピー</button>
     </div>
     <div class="table-wrap is-cardable">
       <table class="data-table data-table--fixed">
@@ -1859,6 +1890,8 @@ function renderDisposalTargetBody(root) {
       renderDisposalTargetScreen(root);
     });
   });
+  const copyBtn = body.querySelector('#dt-copy-btn');
+  if (copyBtn) copyBtn.addEventListener('click', () => copyDisposalTargetText(list));
   body.querySelectorAll('[data-customer-bottles]').forEach((el) => el.addEventListener('click', () => openCustomerBottlesModal(el.dataset.customerBottles)));
   body.querySelectorAll('[data-view]').forEach((el) => el.addEventListener('click', () => { APP.detailBottleId = el.dataset.view; APP.detailMode = 'edit'; renderScreen('detail'); }));
   body.querySelectorAll('[data-slider]').forEach((el) => {
