@@ -546,14 +546,6 @@ table.data-table--fixed th {
 
 .star-mark { color: var(--color-warning-strong); font-size: 16px; }
 .star-mark-red { color: var(--color-danger-strong); font-size: 16px; }
-.star-mark-red-slot {
-  display: inline-block;
-  width: 18px;
-  text-align: center;
-  color: var(--color-danger-strong);
-  font-size: 16px;
-  vertical-align: middle;
-}
 
 /* ---------- 残量スライダー ---------- */
 .amount-slider-wrap {
