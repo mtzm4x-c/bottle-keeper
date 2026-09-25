@@ -506,6 +506,24 @@ function bottleRowHtml(rowId, index) {
   </div>`;
 }
 
+// 名前欄に入力した内容を、カナ欄がまだ手動編集されていない間だけカタカナ変換して自動入力する。
+// カナ欄を直接編集した場合は、その場でひらがな部分だけカタカナに変換する（記号・漢字はそのまま）。
+function attachKanaAutoFill(nameInput, kanaInput) {
+  let kanaTouched = !!(kanaInput.value && kanaInput.value.trim());
+  nameInput.addEventListener('input', () => {
+    if (!kanaTouched) kanaInput.value = BKUtil.toKatakana(nameInput.value);
+  });
+  kanaInput.addEventListener('input', () => {
+    kanaTouched = true;
+    const pos = kanaInput.selectionStart;
+    const converted = BKUtil.toKatakana(kanaInput.value);
+    if (converted !== kanaInput.value) {
+      kanaInput.value = converted;
+      try { kanaInput.setSelectionRange(pos, pos); } catch (e) { /* 一部の入力タイプでは非対応 */ }
+    }
+  });
+}
+
 function attachBottleRowEvents(root, rowEl) {
   const typeSelect = rowEl.querySelector('.row-bottleType');
   const otherInput = rowEl.querySelector('.row-bottleTypeOther');
@@ -521,6 +539,7 @@ function attachBottleRowEvents(root, rowEl) {
     updateRowIndexesAndRemoveButtons(root);
     refreshAllRowBottleNoSelects(root);
   });
+  attachKanaAutoFill(rowEl.querySelector('.row-bottleName'), rowEl.querySelector('.row-bottleNameKana'));
 }
 
 function updateRowIndexesAndRemoveButtons(root) {
@@ -2736,6 +2755,8 @@ function renderDetailScreen(root) {
   root.querySelectorAll('[data-goto-bottle]').forEach((el) => {
     el.addEventListener('click', () => goToBottleDetailWithGuard(root, bottle, customer, el.dataset.gotoBottle));
   });
+
+  attachKanaAutoFill(root.querySelector('#d-bottleName'), root.querySelector('#d-bottleNameKana'));
 
   const slider = root.querySelector('#d-remaining-slider');
   slider.addEventListener('input', () => {
