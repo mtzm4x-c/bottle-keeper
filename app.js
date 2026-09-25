@@ -2446,14 +2446,16 @@ async function loadAndRenderResponseHistory(root) {
     <div class="table-wrap is-cardable">
       <table class="data-table">
         <thead><tr>
-          <th>日時</th><th>ニックネーム</th><th>ボトル</th><th>チェック</th><th>コメント</th><th>デバイス</th><th>操作</th>
+          <th>日時</th><th>ニックネーム</th><th>銘柄</th><th>No</th><th>名前</th><th>チェック</th><th>コメント</th><th>デバイス</th><th>操作</th>
         </tr></thead>
         <tbody>
         ${responses.map((r) => `
           <tr>
             <td data-label="日時">${r.submittedAt ? new Date(r.submittedAt).toLocaleString('ja-JP') : ''}</td>
             <td data-label="ニックネーム">${escapeHtml(r.nickname)}</td>
-            <td data-label="ボトル">${escapeHtml(r.bottleNo)}:${escapeHtml(r.customerName)}</td>
+            <td data-label="銘柄">${escapeHtml(r.bottleType)}</td>
+            <td data-label="No">${escapeHtml(r.bottleNo)}</td>
+            <td data-label="名前">${escapeHtml(r.customerName)}</td>
             <td data-label="チェック">${r.keep ? '○' : '×'}</td>
             <td class="text-muted" data-label="コメント">${escapeHtml(r.comment)}</td>
             <td data-label="デバイス">${escapeHtml(r.device)}</td>
