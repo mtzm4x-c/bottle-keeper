@@ -222,6 +222,7 @@ function renderScreen(screen) {
     case 'manage-bottle': return renderManageBottleScreen(root);
     case 'manage-customer': return renderManageCustomerScreen(root);
     case 'merge': return renderMergeScreen(root);
+    case 'visit-date-search': return renderVisitDateSearchScreen(root);
     case 'disposal-target': return renderDisposalTargetScreen(root);
     case 'disposal-history': return renderDisposalHistoryScreen(root);
     case 'staff-review': return renderStaffReviewScreen(root);
@@ -1084,7 +1085,20 @@ function renderManageBottleScreen(root) {
   });
 }
 
+// 指定した種類の「空き番号」を、プレースホルダー行（customerなし）として返す。
+// ボトル一覧で「登録されていない番号」も一覧内に表示し、空いていることが一目でわかるようにするため。
+function vacantSlotRows(type) {
+  const max = maxNoFor(type);
+  const used = new Set(APP.bottles.filter((b) => b.status === 'active' && b.bottleType === type).map((b) => b.bottleNo));
+  const rows = [];
+  for (let n = 1; n <= max; n++) {
+    if (!used.has(n)) rows.push({ bottle: { bottleType: type, bottleNo: n }, customer: null, vacant: true });
+  }
+  return rows;
+}
+
 function renderManageBottleBody(root) {
+  const f = APP.filters;
   const list = APP.bottles
     .filter((b) => b.status === 'active' && bottleMatchesTab(b, APP.manageBottleTab))
     .map((b) => ({ bottle: b, customer: getCustomer(b.customerId) }))
@@ -1093,6 +1107,19 @@ function renderManageBottleBody(root) {
   const sortKey = APP.sort.manageBottle?.key || 'bottleNo';
   const sortDir = APP.sort.manageBottle?.dir || 'asc';
   sortRows(list, sortKey, sortDir, (row) => rowSortValue(row, sortKey));
+
+  // 空き番号の表示は「特定の種類タブを選んでいる」かつ「ボトルNo.順で見ている」時だけ行う
+  // （「すべて」タブや、名前・来店日順ソートでは番号レンジそのものに意味がないため）
+  const isRealTypeTab = BOTTLE_TYPES.includes(APP.manageBottleTab) && APP.manageBottleTab !== OTHER_UNLABELED_TAB;
+  const showVacant = isRealTypeTab && sortKey === 'bottleNo'
+    && !f.freeword && !f.star && !f.status && !f.yearMonth;
+  let displayList = list;
+  if (showVacant) {
+    const vacantRows = vacantSlotRows(APP.manageBottleTab)
+      .filter((r) => !f.bottleNo || String(r.bottle.bottleNo) === String(f.bottleNo).trim());
+    displayList = [...list, ...vacantRows];
+    sortRows(displayList, 'bottleNo', sortDir, (row) => row.bottle.bottleNo);
+  }
 
   root.querySelector('#mb-count').textContent = `${list.length}件`;
   const body = root.querySelector('#mb-body');
@@ -1132,13 +1159,33 @@ function renderManageBottleBody(root) {
           `}
         </tr></thead>
         <tbody>
-          ${list.length === 0 ? '' : list.map(({ bottle, customer }) => {
+          ${displayList.length === 0 ? '' : displayList.map(({ bottle, customer, vacant }) => {
+            if (vacant) {
+              return APP.settings.simpleModeBottle ? `
+              <tr class="is-vacant-slot">
+                <td data-label=""></td>
+                <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+                <td class="text-muted" data-label="ボトル名"><span class="text-faint">空き</span></td>
+                <td data-label="お客様名"><span class="text-faint">-</span></td>
+                <td data-label="操作"></td>
+              </tr>` : `
+              <tr class="is-vacant-slot">
+                <td data-label=""></td>
+                <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+                <td class="text-muted" data-label="ボトル名"><span class="text-faint">空き</span></td>
+                <td data-label="お客様名"><span class="text-faint">-</span></td>
+                <td class="date-cell-compact" data-label="最終来店日">-</td>
+                <td class="text-muted" data-label="特徴・注意事項"></td>
+                <td data-label="状態"><span class="text-faint">空き番号</span></td>
+                <td data-label="操作"></td>
+              </tr>`;
+            }
             const status = computeStatus(bottle, customer);
             if (APP.settings.simpleModeBottle) {
               return `
               <tr>
                 <td data-label=""><button class="btn btn-sm btn-visit" data-visit="${customer.id}">来店</button></td>
-                <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+                <td data-label="ボトルNo.">${customer.star ? '<span class="star-mark-red">★</span> ' : ''}${bottleTagHtml(bottle)}</td>
                 <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(bottle.bottleName, bottle.bottleNameKana)}</td>
                 <td data-label="お客様名"><button class="customer-link" data-customer-bottles="${customer.id}">${escapeHtml(customer.name)}</button></td>
                 <td class="flex-row" data-label="操作">
@@ -1149,7 +1196,7 @@ function renderManageBottleBody(root) {
             return `
             <tr>
               <td data-label=""><button class="btn btn-sm btn-visit" data-visit="${customer.id}">来店</button></td>
-              <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+              <td data-label="ボトルNo.">${customer.star ? '<span class="star-mark-red">★</span> ' : ''}${bottleTagHtml(bottle)}</td>
               <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(bottle.bottleName, bottle.bottleNameKana)}</td>
               <td data-label="お客様名">
                 <button class="customer-link" data-customer-bottles="${customer.id}">${escapeHtml(customer.name)}</button> ${starHtml(customer)}<br>
@@ -1165,7 +1212,7 @@ function renderManageBottleBody(root) {
           }).join('')}
         </tbody>
       </table>
-      ${list.length === 0 ? '<div class="empty-state">該当するボトルがありません</div>' : ''}
+      ${displayList.length === 0 ? '<div class="empty-state">該当するボトルがありません</div>' : ''}
     </div>
   `;
 
@@ -1744,6 +1791,167 @@ function renderMergeScreen(root) {
     showToast(`${sourceBottles.length}本を ${finalName} 様に統合しました`);
     renderScreen('merge');
   });
+}
+
+// ==========================================================================
+// 13.5 画面：来店日検索
+// ==========================================================================
+
+// 指定した日付に来店登録されたボトルを一覧化する。
+// visit は「お客様単位・1日1件」のデータなので、該当日のvisitからお客様を割り出し、
+// そのお客様の現在アクティブな全ボトルを展開する（1人が複数本持っていれば複数行になる）。
+function getVisitedBottlesForDate(dateStr) {
+  const visitsOnDate = APP.visits.filter((v) => v.visitDate === dateStr);
+  const rows = [];
+  for (const visit of visitsOnDate) {
+    const customer = getCustomer(visit.customerId);
+    if (!customer) continue;
+    for (const bottle of getActiveBottlesOf(visit.customerId)) {
+      rows.push({ bottle, customer, visit });
+    }
+  }
+  return rows;
+}
+
+function renderVisitDateSearchScreen(root) {
+  // 初回表示時のみ当日をデフォルトにする。以後（並び替え・来店追加後の再描画など）は
+  // 閲覧中の日付を保持する（renderScreen()経由の再描画のたびに今日へ戻ってしまうと、
+  // 「＋来店記録を追加」の直後に表示日が今日にリセットされてしまうため）。
+  if (!APP.visitDateSearch) APP.visitDateSearch = { date: BKUtil.todayJST(), sort: 'checkin' };
+  root.innerHTML = `
+    <h2 class="screen-title">来店日検索</h2>
+    <div id="vds-body"></div>
+  `;
+  renderVisitDateSearchBody(root);
+}
+
+function renderVisitDateSearchBody(root) {
+  const state = APP.visitDateSearch;
+  const today = BKUtil.todayJST();
+  const rows = getVisitedBottlesForDate(state.date);
+
+  const groupOrder = effectiveTypeTabs().map((t) => t.key);
+  const sorted = [...rows];
+  if (state.sort === 'bottleNo') {
+    sorted.sort((a, b) => {
+      const ga = groupOrder.indexOf(bottleGroupKey(a.bottle));
+      const gb = groupOrder.indexOf(bottleGroupKey(b.bottle));
+      if (ga !== gb) return ga - gb;
+      return a.bottle.bottleNo - b.bottle.bottleNo;
+    });
+  } else {
+    sorted.sort((a, b) => (a.visit.createdAt < b.visit.createdAt ? -1 : a.visit.createdAt > b.visit.createdAt ? 1 : 0));
+  }
+
+  const body = root.querySelector('#vds-body');
+  body.innerHTML = `
+    <div class="flex-row" style="align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+      <button class="btn btn-sm btn-ghost" id="vds-prev">◀</button>
+      <input type="date" id="vds-date-picker" value="${state.date}" max="${today}">
+      <button class="btn btn-sm btn-ghost" id="vds-next" ${state.date >= today ? 'disabled' : ''}>▶</button>
+      <span class="text-muted">${BKUtil.displayDate(state.date)}</span>
+      <span class="count-badge">${rows.length}件</span>
+      <button class="btn btn-sm btn-primary" id="vds-add" style="margin-left:auto;">＋来店記録を追加</button>
+    </div>
+    <div class="flex-row" style="align-items:center; gap:8px; margin-bottom:10px;">
+      <span class="text-muted" style="font-size:13px;">並び替え：</span>
+      <button class="btn btn-sm ${state.sort === 'checkin' ? 'btn-primary' : 'btn-ghost'}" data-sortbtn="checkin">来店順</button>
+      <button class="btn btn-sm ${state.sort === 'bottleNo' ? 'btn-primary' : 'btn-ghost'}" data-sortbtn="bottleNo">ボトル番号順</button>
+    </div>
+    <div class="table-wrap is-cardable">
+      <table class="data-table">
+        <thead><tr><th>ボトル・お客様</th><th>来店登録時刻</th><th>操作</th></tr></thead>
+        <tbody>
+        ${sorted.map(({ bottle, customer, visit }) => `
+          <tr>
+            <td data-label="ボトル・お客様">${bottleTagHtml(bottle)}<br>${escapeHtml(customer.name)}</td>
+            <td class="text-muted" data-label="来店登録時刻">${new Date(visit.createdAt).toLocaleString('ja-JP')}</td>
+            <td data-label="操作"><button class="btn btn-sm btn-ghost" data-edit-bottle="${bottle.id}">修正画面へ</button></td>
+          </tr>
+        `).join('')}
+        </tbody>
+      </table>
+      ${sorted.length === 0 ? '<div class="empty-state">この日に来店記録はありません</div>' : ''}
+    </div>
+  `;
+
+  body.querySelector('#vds-prev').addEventListener('click', () => {
+    state.date = BKUtil.addDays(state.date, -1);
+    renderVisitDateSearchBody(root);
+  });
+  const nextBtn = body.querySelector('#vds-next');
+  if (!nextBtn.disabled) {
+    nextBtn.addEventListener('click', () => {
+      state.date = BKUtil.addDays(state.date, 1);
+      renderVisitDateSearchBody(root);
+    });
+  }
+  body.querySelector('#vds-date-picker').addEventListener('change', (e) => {
+    if (!e.target.value) return;
+    state.date = e.target.value;
+    renderVisitDateSearchBody(root);
+  });
+  body.querySelectorAll('[data-sortbtn]').forEach((el) => {
+    el.addEventListener('click', () => {
+      state.sort = el.dataset.sortbtn;
+      renderVisitDateSearchBody(root);
+    });
+  });
+  body.querySelectorAll('[data-edit-bottle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      APP.detailBottleId = el.dataset.editBottle;
+      APP.detailMode = 'edit';
+      renderScreen('detail');
+    });
+  });
+  body.querySelector('#vds-add').addEventListener('click', () => openAddVisitSearchModal(state.date, root));
+}
+
+// ボトルを検索して、表示中の日付で来店登録を後から追加する
+function openAddVisitSearchModal(dateStr, root) {
+  const bodyHtml = `
+    <div class="form-field">
+      <label>銘柄・お客様名などで検索</label>
+      <input type="text" id="avs-search" placeholder="例：金宮、太郎など">
+    </div>
+    <div id="avs-results" class="candidate-list"><p class="text-muted">検索キーワードを入力してください</p></div>
+  `;
+  const actions = `<button class="btn btn-ghost" id="m-close">閉じる</button>`;
+  const box = openModal(`来店記録を追加（${BKUtil.displayDate(dateStr)}）`, bodyHtml, actions);
+  box.querySelector('#m-close').addEventListener('click', closeModal);
+
+  const searchInput = box.querySelector('#avs-search');
+  const resultsEl = box.querySelector('#avs-results');
+  function renderResults() {
+    const q = searchInput.value.trim();
+    if (!q) { resultsEl.innerHTML = '<p class="text-muted">検索キーワードを入力してください</p>'; return; }
+    const matches = APP.bottles
+      .filter((b) => b.status === 'active')
+      .filter((b) => {
+        if (String(b.bottleNo) === q) return true;
+        const c = getCustomer(b.customerId);
+        return matchesFreeword(q, c.name, c.kana, b.bottleName, b.bottleNameKana, c.memo);
+      })
+      .slice(0, 30);
+    resultsEl.innerHTML = matches.length === 0
+      ? '<p class="text-muted">該当するボトルが見つかりません</p>'
+      : matches.map((b) => {
+          const c = getCustomer(b.customerId);
+          return `
+          <div class="flex-row" style="justify-content:space-between; align-items:center; padding:8px 4px; border-bottom:1px solid var(--color-border-soft);">
+            <span>${bottleTagHtml(b)} ${escapeHtml(c.name)} 様（${escapeHtml(c.kana)}）${b.bottleName ? `「${escapeHtml(b.bottleName)}」` : ''}</span>
+            <button class="btn btn-sm btn-primary" data-add-visit="${b.id}">この方の来店を記録</button>
+          </div>`;
+        }).join('');
+    resultsEl.querySelectorAll('[data-add-visit]').forEach((el) => {
+      el.addEventListener('click', async () => {
+        const b = APP.bottles.find((x) => x.id === el.dataset.addVisit);
+        closeModal();
+        await registerVisit(b.customerId, dateStr);
+      });
+    });
+  }
+  searchInput.addEventListener('input', renderResults);
 }
 
 // ==========================================================================

@@ -155,6 +155,12 @@ BKUtil.addDays = function (dateStr, nDays) {
 };
 
 // ---- フリガナ正規化（ひらがな/カタカナ吸収 + 簡易ゆらぎ吸収） ----
+// ひらがな → カタカナ（記号・漢字・英数字はそのまま。normalizeKanaの逆方向）
+BKUtil.toKatakana = function (str) {
+  if (!str) return '';
+  return str.replace(/[ぁ-ゖ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+};
+
 BKUtil.normalizeKana = function (str) {
   if (!str) return '';
   // カタカナ → ひらがな に統一
