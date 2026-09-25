@@ -1087,6 +1087,11 @@ function renderManageBottleScreen(root) {
 
 // 指定した種類の「空き番号」を、プレースホルダー行（customerなし）として返す。
 // ボトル一覧で「登録されていない番号」も一覧内に表示し、空いていることが一目でわかるようにするため。
+// ★の有無に関わらず常に同じ幅の枠を出力し、ボトル番号タグの位置がずれないようにする
+function starMarkRedSlotHtml(customer) {
+  return `<span class="star-mark-red-slot">${customer && customer.star ? '★' : ''}</span>`;
+}
+
 function vacantSlotRows(type) {
   const max = maxNoFor(type);
   const used = new Set(APP.bottles.filter((b) => b.status === 'active' && b.bottleType === type).map((b) => b.bottleNo));
@@ -1164,14 +1169,14 @@ function renderManageBottleBody(root) {
               return APP.settings.simpleModeBottle ? `
               <tr class="is-vacant-slot">
                 <td data-label=""></td>
-                <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+                <td data-label="ボトルNo.">${starMarkRedSlotHtml(null)}${bottleTagHtml(bottle)}</td>
                 <td class="text-muted" data-label="ボトル名"><span class="text-faint">空き</span></td>
                 <td data-label="お客様名"><span class="text-faint">-</span></td>
                 <td data-label="操作"></td>
               </tr>` : `
               <tr class="is-vacant-slot">
                 <td data-label=""></td>
-                <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+                <td data-label="ボトルNo.">${starMarkRedSlotHtml(null)}${bottleTagHtml(bottle)}</td>
                 <td class="text-muted" data-label="ボトル名"><span class="text-faint">空き</span></td>
                 <td data-label="お客様名"><span class="text-faint">-</span></td>
                 <td class="date-cell-compact" data-label="最終来店日">-</td>
@@ -1185,7 +1190,7 @@ function renderManageBottleBody(root) {
               return `
               <tr>
                 <td data-label=""><button class="btn btn-sm btn-visit" data-visit="${customer.id}">来店</button></td>
-                <td data-label="ボトルNo.">${customer.star ? '<span class="star-mark-red">★</span> ' : ''}${bottleTagHtml(bottle)}</td>
+                <td data-label="ボトルNo.">${starMarkRedSlotHtml(customer)}${bottleTagHtml(bottle)}</td>
                 <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(bottle.bottleName, bottle.bottleNameKana)}</td>
                 <td data-label="お客様名"><button class="customer-link" data-customer-bottles="${customer.id}">${escapeHtml(customer.name)}</button></td>
                 <td class="flex-row" data-label="操作">
@@ -1196,7 +1201,7 @@ function renderManageBottleBody(root) {
             return `
             <tr>
               <td data-label=""><button class="btn btn-sm btn-visit" data-visit="${customer.id}">来店</button></td>
-              <td data-label="ボトルNo.">${customer.star ? '<span class="star-mark-red">★</span> ' : ''}${bottleTagHtml(bottle)}</td>
+              <td data-label="ボトルNo.">${starMarkRedSlotHtml(customer)}${bottleTagHtml(bottle)}</td>
               <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(bottle.bottleName, bottle.bottleNameKana)}</td>
               <td data-label="お客様名">
                 <button class="customer-link" data-customer-bottles="${customer.id}">${escapeHtml(customer.name)}</button> ${starHtml(customer)}<br>
