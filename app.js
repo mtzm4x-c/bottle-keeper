@@ -821,20 +821,18 @@ function openCustomerBottlesModal(customerId) {
   const customer = getCustomer(customerId);
   const bottles = getActiveBottlesOf(customerId);
   const body = `
-    <p class="text-muted">${escapeHtml(customer.kana)}</p>
     ${customer.memo ? `<p class="text-muted">特徴・注意事項：${escapeHtml(customer.memo)}</p>` : ''}
     <div class="table-wrap is-cardable" style="margin-top:12px;">
-      <table class="data-table data-table--fixed">
+      <table class="data-table data-table--fixed data-table--modal">
         <colgroup>
-          <col style="width:120px"><col style="width:30%"><col style="width:30%"><col style="width:110px">
+          <col style="width:170px"><col><col style="width:140px">
         </colgroup>
-        <thead><tr><th>ボトルNo.</th><th>ボトル名</th><th>ボトル名（カナ）</th><th>最終来店日</th></tr></thead>
+        <thead><tr><th>銘柄・No.</th><th>ボトル名</th><th>最終来店日</th></tr></thead>
         <tbody>
           ${bottles.map((b) => `
             <tr>
-              <td data-label="ボトルNo.">${bottleTagHtml(b)}</td>
+              <td data-label="銘柄・No.">${bottleTagHtml(b)}</td>
               <td class="text-muted" data-label="ボトル名">${escapeHtml(b.bottleName)}</td>
-              <td class="text-muted" data-label="ボトル名（カナ）">${escapeHtml(b.bottleNameKana)}</td>
               <td class="date-cell-compact" data-label="最終来店日">${BKUtil.displayDate(b.lastVisitDate)}</td>
             </tr>
           `).join('')}
@@ -965,7 +963,6 @@ function searchBarHtml(options = {}) {
           ${dayOptions().map((d) => `<option value="${d}" ${f.yearMonth.length === 10 && f.yearMonth.slice(8,10) === d ? 'selected' : ''}>${Number(d)}日</option>`).join('')}
         </select>
       </div>
-      <p class="text-faint" style="font-size:12px; margin-top:4px;">日を指定しない場合は、その年月に該当すれば表示されます。</p>
     </div>
     <div class="search-bar__field">
       <label>★残し</label>
@@ -2086,9 +2083,9 @@ function renderDisposalTargetBody(root) {
       <button class="btn btn-sm btn-ghost" id="dt-copy-link-btn">🔗 確認ページのURLをコピー</button>
     </div>
     <div class="table-wrap is-cardable">
-      <table class="data-table data-table--fixed">
+      <table class="data-table data-table--fixed data-table--disposal">
         <colgroup>
-          <col style="width:26%"><col style="width:104px"><col style="width:70px"><col style="width:40%"><col style="width:130px"><col style="width:130px">
+          <col style="width:220px"><col style="width:104px"><col style="width:70px"><col><col style="width:130px"><col style="width:130px">
         </colgroup>
         <thead><tr>
           <th data-sort="bottleNo" class="${!sortState || sortState.key !== 'elapsedDays' ? 'sort-active' : ''}">ボトル・お客様</th>
@@ -2536,13 +2533,30 @@ function commentsHtml(comments) {
   `).join('<hr style="border:none; border-top:1px solid var(--color-border-soft); margin:6px 0;">');
 }
 
+// 確認結果・回答履歴の画面上部に出す、スタッフ向け回答ページへのリンク（開く／URLコピー）
+function responsePageLinkHtml() {
+  return `
+    <div class="flex-row" style="align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 14px;">
+      <span class="text-muted" style="font-size:13px;">回答ページ：</span>
+      <a href="${DISCARD_CHECK_PAGE_URL}" target="_blank" rel="noopener" style="font-size:13px; word-break:break-all;">${DISCARD_CHECK_PAGE_URL}</a>
+      <button class="btn btn-sm btn-ghost" id="rp-copy-link">🔗 URLをコピー</button>
+    </div>
+  `;
+}
+
+function attachResponsePageLinkEvents(root) {
+  root.querySelector('#rp-copy-link').addEventListener('click', () => copyToClipboard(DISCARD_CHECK_PAGE_URL, '回答ページのURLをコピーしました'));
+}
+
 function renderStaffReviewScreen(root) {
   staffReviewPromotedBottleIds = new Set();
   root.innerHTML = `
     <h2 class="screen-title">確認結果</h2>
     <p class="text-muted">スタッフが確認ページで送信した内容です。「残す候補」はチェックを入れて一括で★にできます。「要確認」はコメントのみのため、修正画面で個別に判断してください。</p>
+    ${responsePageLinkHtml()}
     <div id="sr-body"><div class="empty-state">読み込み中...</div></div>
   `;
+  attachResponsePageLinkEvents(root);
   loadAndRenderStaffReview(root);
 }
 
@@ -2660,8 +2674,10 @@ function renderResponseHistoryScreen(root) {
   root.innerHTML = `
     <h2 class="screen-title">回答履歴</h2>
     <p class="text-muted">スタッフが確認ページで送信した内容の全履歴です。</p>
+    ${responsePageLinkHtml()}
     <div id="rh-body"><div class="empty-state">読み込み中...</div></div>
   `;
+  attachResponsePageLinkEvents(root);
   loadAndRenderResponseHistory(root);
 }
 

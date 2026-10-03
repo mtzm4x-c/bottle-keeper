@@ -384,6 +384,8 @@ html, body {
   color: var(--color-text);
   padding: 9px 12px;
   font-size: 14px;
+  box-sizing: border-box;
+  height: 42px;
 }
 .search-bar input:focus, .search-bar select:focus {
   outline: 2px solid var(--color-accent);
@@ -409,6 +411,21 @@ table.data-table {
 /* 内容の長さに関わらず列幅を固定し、選んだ種類によって列の位置がずれるのを防ぐ */
 table.data-table--fixed {
   table-layout: fixed;
+}
+/* 所有ボトルのモーダル用：狭い幅でも横スクロールさせず、最終来店日が見切れないようにする */
+table.data-table--modal {
+  min-width: 0;
+}
+table.data-table--modal thead th,
+table.data-table--modal tbody td {
+  padding: 10px 8px;
+}
+table.data-table--modal .date-cell-compact {
+  white-space: nowrap;
+}
+/* 破棄対象画面：ボトルNo.札の列をpx固定にし、タブレット縦画面でも札が途切れないよう最小幅を確保する */
+table.data-table--disposal {
+  min-width: 900px;
 }
 table.data-table--fixed td,
 table.data-table--fixed th {
