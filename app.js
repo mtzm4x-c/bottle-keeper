@@ -1961,6 +1961,38 @@ function openAddVisitSearchModal(dateStr, root) {
 // 14. 画面：破棄対象
 // ==========================================================================
 
+// 残量スライダー（左に－10/－5、右に＋5/＋10のボタン付き）。破棄対象画面とボトル詳細画面で共通。
+function remainingSliderHtml(bottleId, value) {
+  const stepBtn = (d) => `<button type="button" class="btn amount-step" data-step="${d}">${d > 0 ? '＋' : '－'}${Math.abs(d)}</button>`;
+  return `
+    <div class="amount-slider" data-bottle="${bottleId}">
+      <div class="amount-value-row">残量 <span class="amount-value">${value}%</span></div>
+      <div class="amount-slider-wrap">
+        ${stepBtn(-10)}${stepBtn(-5)}
+        <input type="range" class="amount-range" min="0" max="100" step="5" value="${value}">
+        ${stepBtn(5)}${stepBtn(10)}
+      </div>
+    </div>`;
+}
+
+function attachRemainingSliderEvents(scope) {
+  scope.querySelectorAll('.amount-slider').forEach((box) => {
+    const bottleId = box.dataset.bottle;
+    const range = box.querySelector('.amount-range');
+    const label = box.querySelector('.amount-value');
+    const apply = (v) => {
+      const n = Math.max(0, Math.min(100, v));
+      range.value = n;
+      APP.remainingDraft[bottleId] = n;
+      label.textContent = `${n}%`;
+    };
+    range.addEventListener('input', () => apply(Number(range.value)));
+    box.querySelectorAll('[data-step]').forEach((b) => {
+      b.addEventListener('click', () => apply(Number(range.value) + Number(b.dataset.step)));
+    });
+  });
+}
+
 function renderDisposalTargetScreen(root) {
   root.innerHTML = `
     <h2 class="screen-title">破棄対象 <span class="count-badge" id="dt-count">0件</span></h2>
@@ -2085,12 +2117,13 @@ function renderDisposalTargetBody(root) {
     <div class="table-wrap is-cardable">
       <table class="data-table data-table--fixed data-table--disposal">
         <colgroup>
-          <col style="width:220px"><col style="width:104px"><col style="width:70px"><col><col style="width:130px"><col style="width:130px">
+          <col style="width:200px"><col style="width:380px"><col style="width:104px"><col style="width:70px"><col>
         </colgroup>
         <thead><tr>
           <th data-sort="bottleNo" class="${!sortState || sortState.key !== 'elapsedDays' ? 'sort-active' : ''}">ボトル・お客様</th>
+          <th>残量・操作</th>
           <th>最終来店日</th><th data-sort="elapsedDays" class="${sortState?.key === 'elapsedDays' ? 'sort-active' : ''}">経過日数 ${sortState?.key === 'elapsedDays' ? (sortState.dir === 'asc' ? '▲' : '▼') : ''}</th>
-          <th>特徴・注意事項</th><th>残量</th><th>操作</th>
+          <th>特徴・注意事項</th>
         </tr></thead>
         <tbody>
         ${list.map(({ bottle, customer }) => {
@@ -2102,19 +2135,16 @@ function renderDisposalTargetBody(root) {
               <button class="customer-link" data-customer-bottles="${customer.id}">${escapeHtml(customer.name)}</button><br>
               <span class="text-faint" style="font-size:12px;">${escapeHtml(customer.kana)}</span>
             </td>
+            <td data-label="残量・操作">
+              ${remainingSliderHtml(bottle.id, draft)}
+              <div class="flex-row" style="margin-top:8px; justify-content:flex-end;">
+                <button class="btn btn-sm btn-ghost" data-view="${bottle.id}">詳細</button>
+                <button class="btn btn-sm btn-danger" data-discard="${bottle.id}">流す</button>
+              </div>
+            </td>
             <td class="date-cell-compact" data-label="最終来店日">${BKUtil.displayDateBroken(bottle.lastVisitDate)}</td>
             <td data-label="経過日数">${elapsedDaysLabel(bottle.lastVisitDate)}</td>
             <td class="text-muted" data-label="特徴・注意事項">${escapeHtml(customer.memo)}</td>
-            <td data-label="残量">
-              <div class="amount-slider-wrap">
-                <input type="range" min="0" max="100" step="5" value="${draft}" data-slider="${bottle.id}">
-                <span class="amount-value" id="amount-${bottle.id}">${draft}%</span>
-              </div>
-            </td>
-            <td class="flex-row" data-label="操作">
-              <button class="btn btn-sm btn-ghost" data-view="${bottle.id}">詳細</button>
-              <button class="btn btn-sm btn-danger" data-discard="${bottle.id}">流す</button>
-            </td>
           </tr>`;
         }).join('')}
         </tbody>
@@ -2159,12 +2189,7 @@ function renderDisposalTargetBody(root) {
   if (copyLinkBtn) copyLinkBtn.addEventListener('click', () => copyToClipboard(DISCARD_CHECK_PAGE_URL, '確認ページのURLをコピーしました'));
   body.querySelectorAll('[data-customer-bottles]').forEach((el) => el.addEventListener('click', () => openCustomerBottlesModal(el.dataset.customerBottles)));
   body.querySelectorAll('[data-view]').forEach((el) => el.addEventListener('click', () => { APP.detailBottleId = el.dataset.view; APP.detailMode = 'edit'; renderScreen('detail'); }));
-  body.querySelectorAll('[data-slider]').forEach((el) => {
-    el.addEventListener('input', () => {
-      APP.remainingDraft[el.dataset.slider] = Number(el.value);
-      document.getElementById(`amount-${el.dataset.slider}`).textContent = `${el.value}%`;
-    });
-  });
+  attachRemainingSliderEvents(body);
   body.querySelectorAll('[data-discard]').forEach((el) => {
     el.addEventListener('click', () => openDiscardModal(el.dataset.discard));
   });
@@ -2938,10 +2963,7 @@ function renderDetailScreen(root) {
 
     <div class="panel">
       <h3 class="mt-0">このボトルを破棄する</h3>
-      <div class="amount-slider-wrap">
-        <input type="range" min="0" max="100" step="5" value="${APP.remainingDraft[bottle.id] ?? 50}" id="d-remaining-slider">
-        <span class="amount-value" id="d-remaining-value">${APP.remainingDraft[bottle.id] ?? 50}%</span>
-      </div>
+      ${remainingSliderHtml(bottle.id, APP.remainingDraft[bottle.id] ?? 50)}
       <div class="flex-row" style="margin-top:12px;">
         <button class="btn btn-danger" id="btn-discard">流す</button>
       </div>
@@ -2988,11 +3010,7 @@ function renderDetailScreen(root) {
 
   attachKanaAutoFill(root.querySelector('#d-bottleName'), root.querySelector('#d-bottleNameKana'));
 
-  const slider = root.querySelector('#d-remaining-slider');
-  slider.addEventListener('input', () => {
-    APP.remainingDraft[bottle.id] = Number(slider.value);
-    root.querySelector('#d-remaining-value').textContent = `${slider.value}%`;
-  });
+  attachRemainingSliderEvents(root);
   root.querySelector('#btn-discard').addEventListener('click', () => openDiscardModal(bottle.id, 'manage-bottle'));
 
   // 他のボトルを検索して、複数選択でこのお客様に統合する
