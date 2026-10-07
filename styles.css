@@ -72,13 +72,18 @@ html, body {
 }
 
 /* ---------- ヘッダー ---------- */
+/* ヘッダー（ロゴ・送信ボタン・時刻）と上部メニューの左右端を揃えるための共通余白 */
+:root { --gutter: 24px; }
+@media (max-width: 900px) { :root { --gutter: 16px; } }
+@media (max-width: 600px) { :root { --gutter: 14px; } }
+
 .app-header {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 24px;
+  padding: 14px var(--gutter);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border-soft);
   flex-shrink: 0;
@@ -104,6 +109,7 @@ html, body {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  margin-left: auto; /* ロゴの下に折り返した時も右端に寄せる */
 }
 
 .app-header__title { flex-shrink: 0; }
@@ -120,6 +126,7 @@ html, body {
 .backup-status {
   font-size: 13px;
   color: var(--color-text-muted);
+  text-align: right;
 }
 .app-version {
   font-size: 11px;
@@ -138,12 +145,13 @@ html, body {
   min-height: 0;
 }
 
-/* 上部メニュー：スクロールしなくても全項目が見えるよう、幅が足りなければ折り返す */
+/* 上部メニュー：左右端をヘッダーに揃え、項目の間隔を均等に配置する。幅が足りなければ折り返す */
 .topnav {
   display: flex;
   flex-wrap: wrap;
+  justify-content: space-between;
   gap: 4px;
-  padding: 8px 20px;
+  padding: 8px var(--gutter);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border-soft);
   flex-shrink: 0;
@@ -172,7 +180,7 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 22px 28px 60px;
+  padding: 22px var(--gutter) 60px;
   min-width: 0;
 }
 
@@ -434,7 +442,7 @@ table.data-table td.cell-nowrap {
 }
 /* 破棄履歴：日付・履歴IDが改行されない幅を確保し、特徴・注意事項の列は細めにする */
 table.data-table--history {
-  min-width: 1200px;
+  min-width: 1060px;
 }
 /* ボトルNo.の列：余白を詰め、札を一回り小さくして、細い列でも札が途切れないようにする */
 table.data-table th.cell-no,
@@ -477,7 +485,7 @@ table.data-table--modal .date-cell-compact {
 }
 /* 破棄対象画面：ボトルNo.札の列をpx固定にし、タブレット縦画面でも札が途切れないよう最小幅を確保する */
 table.data-table--disposal {
-  min-width: 1000px;
+  min-width: 820px;
 }
 table.data-table--fixed td,
 table.data-table--fixed th {
@@ -809,14 +817,16 @@ table.data-table--fixed th {
 @media (max-width: 900px) {
   .form-grid { grid-template-columns: 1fr; }
   .bottle-row__grid { grid-template-columns: 1fr 1fr; }
-  .topnav { padding: 8px 14px; }
   .topnav__item { padding: 10px 9px; font-size: 14px; }
 }
 
 /* 小さめのタブレット縦画面（幅700px前後）：メニュー9項目が1行に収まるよう、文字と余白をさらに詰める */
 @media (max-width: 780px) {
-  .topnav { gap: 2px; padding: 8px 10px; }
+  .topnav { gap: 2px; }
   .topnav__item { padding: 10px 6px; font-size: 13px; }
+}
+@media (max-width: 660px) {
+  .topnav__item { padding: 10px 4px; font-size: 12px; }
 }
 
 /* スマホ横画面向け：幅はあっても高さが低いため、縦方向の余白を詰めて表示領域を確保する */
@@ -834,9 +844,9 @@ table.data-table--fixed th {
 
 /* スマホ縦画面向け：余白を詰めて画面を有効活用する */
 @media (max-width: 600px) {
-  .topnav { padding: 6px 10px; gap: 2px; }
+  .topnav { padding: 6px var(--gutter); gap: 2px; justify-content: center; }
   .topnav__item { padding: 8px 10px; font-size: 13px; }
-  .app-header { padding: 12px 14px; }
+  .app-header { padding: 12px var(--gutter); }
   .app-header__title h1 { font-size: 17px; }
   .backup-status { font-size: 11px; }
   .screen-root { padding: 14px 12px 40px; }

@@ -2141,12 +2141,12 @@ function renderDisposalTargetBody(root) {
     <div class="table-wrap is-cardable">
       <table class="data-table data-table--fixed data-table--disposal">
         <colgroup>
-          <col style="width:200px"><col style="width:340px"><col style="width:160px"><col style="width:70px"><col><col class="dt-col-ops" style="width:150px">
+          <col style="width:190px"><col style="width:310px"><col style="width:150px"><col><col class="dt-col-ops" style="width:150px">
         </colgroup>
         <thead><tr>
           <th data-sort="bottleNo" class="${!sortState || sortState.key !== 'elapsedDays' ? 'sort-active' : ''}">ボトル・お客様</th>
           <th><span class="dt-narrow-only">残量・操作</span><span class="dt-wide-only">残量</span></th>
-          <th>最終来店日</th><th data-sort="elapsedDays" class="${sortState?.key === 'elapsedDays' ? 'sort-active' : ''}">経過日数 ${sortState?.key === 'elapsedDays' ? (sortState.dir === 'asc' ? '▲' : '▼') : ''}</th>
+          <th data-sort="elapsedDays" class="${sortState?.key === 'elapsedDays' ? 'sort-active' : ''}">来店日・経過 ${sortState?.key === 'elapsedDays' ? (sortState.dir === 'asc' ? '▲' : '▼') : ''}</th>
           <th>特徴・注意事項</th>
           <th class="dt-ops-cell">操作</th>
         </tr></thead>
@@ -2167,8 +2167,10 @@ function renderDisposalTargetBody(root) {
                 <button class="btn btn-sm btn-danger" data-discard="${bottle.id}">流す</button>
               </div>
             </td>
-            <td class="cell-nowrap" data-label="最終来店日">${BKUtil.displayDate(bottle.lastVisitDate)}</td>
-            <td data-label="経過日数">${elapsedDaysLabel(bottle.lastVisitDate)}</td>
+            <td class="cell-nowrap" data-label="来店日・経過">
+              ${BKUtil.displayDate(bottle.lastVisitDate)}<br>
+              <span class="text-muted">${elapsedDaysLabel(bottle.lastVisitDate)}経過</span>
+            </td>
             <td class="text-muted" data-label="特徴・注意事項">${escapeHtml(customer.memo)}</td>
             <td class="dt-ops-cell" data-label="操作">
               <div class="dt-ops">
@@ -2326,11 +2328,11 @@ function disposalHistoryTableHtml(list) {
     <div class="table-wrap is-cardable">
       <table class="data-table data-table--fixed data-table--history">
         <colgroup>
-          <col style="width:120px"><col style="width:140px"><col style="width:140px"><col style="width:170px"><col style="width:160px"><col style="width:160px"><col style="width:70px"><col><col style="width:100px">
+          <col style="width:110px"><col style="width:170px"><col style="width:140px"><col style="width:190px"><col style="width:70px"><col style="width:100px"><col style="width:140px"><col>
         </colgroup>
         <thead><tr>
-          <th>操作</th><th>履歴ID</th><th>ボトル名</th><th>お客様名</th>
-          <th>最終来店日</th><th>破棄日</th><th>残量</th><th>特徴・注意事項</th><th>状態</th>
+          <th>操作</th><th>お客様名</th><th>ボトル名</th>
+          <th>来店日・破棄日</th><th>残量</th><th>状態</th><th>履歴ID</th><th>特徴・注意事項</th>
         </tr></thead>
         <tbody>
         ${list.map((h) => {
@@ -2343,17 +2345,19 @@ function disposalHistoryTableHtml(list) {
           return `
           <tr>
             <td data-label="操作">${restoreBtn}</td>
-            <td class="cell-nowrap" data-label="履歴ID">${escapeHtml(h.displayId)}</td>
-            <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(h.bottleNameSnapshot, h.bottleNameKanaSnapshot)}</td>
             <td data-label="お客様名">
               ${escapeHtml(h.customerNameSnapshot)}<br>
               <span class="text-faint" style="font-size:12px;">${escapeHtml(h.customerKanaSnapshot)}</span>
             </td>
-            <td class="cell-nowrap" data-label="最終来店日">${BKUtil.displayDate(h.lastVisitDateAtDisposal)}</td>
-            <td class="cell-nowrap" data-label="破棄日">${BKUtil.displayDate(BKUtil.jstDateFromISO(h.disposedAt))}</td>
+            <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(h.bottleNameSnapshot, h.bottleNameKanaSnapshot)}</td>
+            <td class="cell-nowrap" data-label="来店日・破棄日">
+              <span class="text-faint">来店</span> ${BKUtil.displayDate(h.lastVisitDateAtDisposal)}<br>
+              <span class="text-faint">破棄</span> ${BKUtil.displayDate(BKUtil.jstDateFromISO(h.disposedAt))}
+            </td>
             <td data-label="残量">${h.remainingAmount}%</td>
-            <td class="text-muted" data-label="特徴・注意事項">${escapeHtml(h.memo)}</td>
             <td data-label="状態">${h.status === 'restored' ? '<span class="status-pill status-normal">復元済み</span>' : '<span class="status-pill status-target">破棄済み</span>'}</td>
+            <td class="cell-nowrap" data-label="履歴ID">${escapeHtml(h.displayId)}</td>
+            <td class="text-muted" data-label="特徴・注意事項">${escapeHtml(h.memo)}</td>
           </tr>`;
         }).join('')}
         </tbody>
