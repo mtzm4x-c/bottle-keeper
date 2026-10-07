@@ -262,6 +262,17 @@ function getActiveBottlesOf(customerId) {
   return APP.bottles.filter((b) => b.customerId === customerId && b.status === 'active');
 }
 
+// ボトルを「銘柄タブの並び（金宮→角→ホワイト…）→ボトルNo.順」に並べる。
+// 複数本持っているお客様の表示順を、一覧のフィルタ（銘柄タブ）の順番に揃えるために使う。
+function sortBottlesByBrandOrder(bottles) {
+  const order = effectiveTypeTabs().map((t) => t.key);
+  const idx = (b) => {
+    const i = order.indexOf(bottleGroupKey(b));
+    return i === -1 ? order.length : i;
+  };
+  return [...bottles].sort((a, b) => idx(a) - idx(b) || a.bottleNo - b.bottleNo);
+}
+
 // 統合などでお客様に複数ボトルが集約された際、最終来店日を一番新しい日付に揃える
 // （例：金宮5月・角2月を統合した場合、両方とも5月にする）
 async function syncCustomerLastVisitToLatest(customerId) {
@@ -832,7 +843,7 @@ async function handleAddSubmit(root) {
 
 function openCustomerBottlesModal(customerId) {
   const customer = getCustomer(customerId);
-  const bottles = getActiveBottlesOf(customerId);
+  const bottles = sortBottlesByBrandOrder(getActiveBottlesOf(customerId));
   const body = `
     ${customer.memo ? `<p class="text-muted">特徴・注意事項：${escapeHtml(customer.memo)}</p>` : ''}
     <div class="table-wrap is-cardable" style="margin-top:12px;">
@@ -1291,7 +1302,7 @@ function renderManageCustomerScreen(root) {
 
 function renderManageCustomerBody(root) {
   const rows = APP.customers
-    .map((c) => ({ customer: c, bottles: getActiveBottlesOf(c.id) }))
+    .map((c) => ({ customer: c, bottles: sortBottlesByBrandOrder(getActiveBottlesOf(c.id)) }))
     .filter((r) => r.bottles.length > 0)
     .filter((r) => r.bottles.some((b) => bottleMatchesFilters(b, r.customer)));
 
@@ -2130,13 +2141,14 @@ function renderDisposalTargetBody(root) {
     <div class="table-wrap is-cardable">
       <table class="data-table data-table--fixed data-table--disposal">
         <colgroup>
-          <col style="width:200px"><col style="width:380px"><col style="width:104px"><col style="width:70px"><col>
+          <col style="width:200px"><col style="width:340px"><col style="width:160px"><col style="width:70px"><col><col class="dt-col-ops" style="width:150px">
         </colgroup>
         <thead><tr>
           <th data-sort="bottleNo" class="${!sortState || sortState.key !== 'elapsedDays' ? 'sort-active' : ''}">ボトル・お客様</th>
-          <th>残量・操作</th>
+          <th><span class="dt-narrow-only">残量・操作</span><span class="dt-wide-only">残量</span></th>
           <th>最終来店日</th><th data-sort="elapsedDays" class="${sortState?.key === 'elapsedDays' ? 'sort-active' : ''}">経過日数 ${sortState?.key === 'elapsedDays' ? (sortState.dir === 'asc' ? '▲' : '▼') : ''}</th>
           <th>特徴・注意事項</th>
+          <th class="dt-ops-cell">操作</th>
         </tr></thead>
         <tbody>
         ${list.map(({ bottle, customer }) => {
@@ -2150,14 +2162,20 @@ function renderDisposalTargetBody(root) {
             </td>
             <td data-label="残量・操作">
               ${remainingSliderHtml(bottle.id, draft)}
-              <div class="flex-row" style="margin-top:8px; justify-content:flex-end;">
+              <div class="dt-ops dt-ops-inline" style="margin-top:8px;">
                 <button class="btn btn-sm btn-ghost" data-view="${bottle.id}">詳細</button>
                 <button class="btn btn-sm btn-danger" data-discard="${bottle.id}">流す</button>
               </div>
             </td>
-            <td class="date-cell-compact" data-label="最終来店日">${BKUtil.displayDateBroken(bottle.lastVisitDate)}</td>
+            <td class="cell-nowrap" data-label="最終来店日">${BKUtil.displayDate(bottle.lastVisitDate)}</td>
             <td data-label="経過日数">${elapsedDaysLabel(bottle.lastVisitDate)}</td>
             <td class="text-muted" data-label="特徴・注意事項">${escapeHtml(customer.memo)}</td>
+            <td class="dt-ops-cell" data-label="操作">
+              <div class="dt-ops">
+                <button class="btn btn-sm btn-ghost" data-view="${bottle.id}">詳細</button>
+                <button class="btn btn-sm btn-danger" data-discard="${bottle.id}">流す</button>
+              </div>
+            </td>
           </tr>`;
         }).join('')}
         </tbody>
@@ -2306,9 +2324,9 @@ function renderDisposalHistoryScreen(root) {
 function disposalHistoryTableHtml(list) {
   return `
     <div class="table-wrap is-cardable">
-      <table class="data-table data-table--fixed data-table--wide">
+      <table class="data-table data-table--fixed data-table--history">
         <colgroup>
-          <col style="width:120px"><col style="width:140px"><col style="width:140px"><col style="width:170px"><col style="width:104px"><col style="width:104px"><col style="width:70px"><col><col style="width:100px">
+          <col style="width:120px"><col style="width:140px"><col style="width:140px"><col style="width:170px"><col style="width:160px"><col style="width:160px"><col style="width:70px"><col><col style="width:100px">
         </colgroup>
         <thead><tr>
           <th>操作</th><th>履歴ID</th><th>ボトル名</th><th>お客様名</th>
@@ -2325,14 +2343,14 @@ function disposalHistoryTableHtml(list) {
           return `
           <tr>
             <td data-label="操作">${restoreBtn}</td>
-            <td data-label="履歴ID">${escapeHtml(h.displayId)}</td>
+            <td class="cell-nowrap" data-label="履歴ID">${escapeHtml(h.displayId)}</td>
             <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(h.bottleNameSnapshot, h.bottleNameKanaSnapshot)}</td>
             <td data-label="お客様名">
               ${escapeHtml(h.customerNameSnapshot)}<br>
               <span class="text-faint" style="font-size:12px;">${escapeHtml(h.customerKanaSnapshot)}</span>
             </td>
-            <td class="date-cell-compact" data-label="最終来店日">${BKUtil.displayDateBroken(h.lastVisitDateAtDisposal)}</td>
-            <td class="date-cell-compact" data-label="破棄日">${BKUtil.displayDateBroken(BKUtil.jstDateFromISO(h.disposedAt))}</td>
+            <td class="cell-nowrap" data-label="最終来店日">${BKUtil.displayDate(h.lastVisitDateAtDisposal)}</td>
+            <td class="cell-nowrap" data-label="破棄日">${BKUtil.displayDate(BKUtil.jstDateFromISO(h.disposedAt))}</td>
             <td data-label="残量">${h.remainingAmount}%</td>
             <td class="text-muted" data-label="特徴・注意事項">${escapeHtml(h.memo)}</td>
             <td data-label="状態">${h.status === 'restored' ? '<span class="status-pill status-normal">復元済み</span>' : '<span class="status-pill status-target">破棄済み</span>'}</td>

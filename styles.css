@@ -403,6 +403,35 @@ table.data-table {
 table.data-table--fixed {
   table-layout: fixed;
 }
+/* 破棄対象画面の「詳細」「流す」ボタン：改行させず1行で右端に置く */
+.dt-ops {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.dt-ops .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.dt-wide-only { display: none; }
+/* 幅が広い画面（PC）：ボタンは右端の「操作」列に置く。狭い画面（タブレット縦など）：スクロールなしで押せるよう、スライダーの下に置く */
+@media (min-width: 1100px) {
+  .dt-narrow-only { display: none; }
+  .dt-wide-only { display: inline; }
+  .dt-ops-inline { display: none !important; }
+}
+@media (max-width: 1099px) {
+  .dt-ops-cell, .dt-col-ops { display: none !important; }
+}
+/* 日付・IDなど、途中で改行させたくないセル */
+table.data-table td.cell-nowrap {
+  white-space: nowrap;
+}
+/* 破棄履歴：日付・履歴IDが改行されない幅を確保し、特徴・注意事項の列は細めにする */
+table.data-table--history {
+  min-width: 1200px;
+}
 /* ボトルNo.の列：余白を詰め、札を一回り小さくして、細い列でも札が途切れないようにする */
 table.data-table th.cell-no,
 table.data-table td.cell-no {
@@ -444,7 +473,7 @@ table.data-table--modal .date-cell-compact {
 }
 /* 破棄対象画面：ボトルNo.札の列をpx固定にし、タブレット縦画面でも札が途切れないよう最小幅を確保する */
 table.data-table--disposal {
-  min-width: 900px;
+  min-width: 1000px;
 }
 table.data-table--fixed td,
 table.data-table--fixed th {
