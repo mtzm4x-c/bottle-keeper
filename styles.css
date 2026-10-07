@@ -825,6 +825,12 @@ table.data-table--fixed th {
   .topnav { gap: 2px; }
   .topnav__item { padding: 10px 6px; font-size: 13px; }
 }
+
+/* ヘッダーが2行になる幅：1行目＝ロゴ、2行目＝バージョン・ボタン類を左寄せ＋プッシュ/プル時刻だけ右寄せ */
+@media (max-width: 760px) {
+  .app-header__status { flex: 1 1 100%; justify-content: flex-start; margin-left: 0; }
+  .backup-status { margin-left: auto; }
+}
 @media (max-width: 660px) {
   .topnav__item { padding: 10px 4px; font-size: 12px; }
 }
