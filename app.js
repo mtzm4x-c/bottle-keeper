@@ -185,16 +185,30 @@ async function manualSyncNow() {
   }
 }
 
+// 送信中はボタンを押せなくして表示を切り替える（ヘッダーと設定画面の両方の「サーバーに送信する」で共通）
+async function syncWithButtonFeedback(btn) {
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '送信中…';
+  try {
+    await manualSyncNow();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
 function setupNav() {
-  document.getElementById('sidenav').addEventListener('click', (e) => {
+  document.getElementById('topnav').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-screen]');
     if (!btn) return;
     renderScreen(btn.dataset.screen);
   });
+  document.getElementById('btn-header-sync').addEventListener('click', (e) => syncWithButtonFeedback(e.currentTarget));
 }
 
 function setActiveNav(screen) {
-  document.querySelectorAll('.sidenav__item').forEach((el) => {
+  document.querySelectorAll('.topnav__item').forEach((el) => {
     el.classList.toggle('is-active', el.dataset.screen === screen);
   });
 }
@@ -226,7 +240,6 @@ function renderScreen(screen) {
     case 'disposal-target': return renderDisposalTargetScreen(root);
     case 'disposal-history': return renderDisposalHistoryScreen(root);
     case 'staff-review': return renderStaffReviewScreen(root);
-    case 'response-history': return renderResponseHistoryScreen(root);
     case 'backup': return renderBackupScreen(root);
     case 'detail': return renderDetailScreen(root);
     default: return renderAddScreen(root);
@@ -1129,32 +1142,32 @@ function renderManageBottleBody(root) {
       }).join('')}
     </div>
     <div class="table-wrap is-cardable ${APP.settings.simpleModeBottle ? 'is-simple' : ''}">
-      <table class="data-table data-table--fixed">
+      <table class="data-table data-table--fixed ${APP.settings.simpleModeBottle ? 'data-table--fit' : 'data-table--wide'}">
         <colgroup>
           ${APP.settings.simpleModeBottle ? `
-          <col style="width:88px"><col style="width:32px"><col style="width:150px"><col style="width:32%"><col style="width:68%"><col style="width:86px">
+          <col style="width:84px"><col style="width:40px"><col style="width:140px"><col><col><col style="width:84px">
           ` : `
-          <col style="width:88px"><col style="width:32px"><col style="width:150px"><col style="width:22%"><col style="width:24%"><col style="width:112px"><col style="width:54%"><col style="width:100px"><col style="width:86px">
+          <col style="width:84px"><col style="width:84px"><col style="width:40px"><col style="width:140px"><col style="width:170px"><col style="width:190px"><col style="width:112px"><col><col style="width:100px">
           `}
         </colgroup>
         <thead><tr>
           ${APP.settings.simpleModeBottle ? `
           <th></th>
-          <th>★</th>
-          <th data-sort="bottleNo">ボトルNo.</th>
+          <th class="cell-star">★</th>
+          <th class="cell-no" data-sort="bottleNo">ボトルNo.</th>
           <th>ボトル名</th>
           <th data-sort="name">お客様名</th>
           <th>操作</th>
           ` : `
           <th></th>
-          <th>★</th>
-          <th data-sort="bottleNo">ボトルNo.</th>
+          <th>操作</th>
+          <th class="cell-star">★</th>
+          <th class="cell-no" data-sort="bottleNo">ボトルNo.</th>
           <th>ボトル名</th>
           <th data-sort="name">お客様名</th>
           <th data-sort="lastVisitDate">最終来店日</th>
           <th>特徴・注意事項</th>
           <th>状態</th>
-          <th>操作</th>
           `}
         </tr></thead>
         <tbody>
@@ -1163,22 +1176,22 @@ function renderManageBottleBody(root) {
               return APP.settings.simpleModeBottle ? `
               <tr class="is-vacant-slot">
                 <td data-label=""></td>
-                <td data-label="★"></td>
-                <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+                <td class="cell-star" data-label="★"></td>
+                <td class="cell-no" data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
                 <td class="text-muted" data-label="ボトル名"><span class="text-faint">空き</span></td>
                 <td data-label="お客様名"><span class="text-faint">-</span></td>
                 <td data-label="操作"></td>
               </tr>` : `
               <tr class="is-vacant-slot">
                 <td data-label=""></td>
-                <td data-label="★"></td>
-                <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+                <td data-label="操作"></td>
+                <td class="cell-star" data-label="★"></td>
+                <td class="cell-no" data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
                 <td class="text-muted" data-label="ボトル名"><span class="text-faint">空き</span></td>
                 <td data-label="お客様名"><span class="text-faint">-</span></td>
                 <td class="date-cell-compact" data-label="最終来店日">-</td>
                 <td class="text-muted" data-label="特徴・注意事項"></td>
                 <td data-label="状態"><span class="text-faint">空き番号</span></td>
-                <td data-label="操作"></td>
               </tr>`;
             }
             const status = computeStatus(bottle, customer);
@@ -1186,8 +1199,8 @@ function renderManageBottleBody(root) {
               return `
               <tr>
                 <td data-label=""><button class="btn btn-sm btn-visit" data-visit="${customer.id}">来店</button></td>
-                <td data-label="★">${customer.star ? '<span class="star-mark-red">★</span>' : ''}</td>
-                <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+                <td class="cell-star" data-label="★">${customer.star ? '<span class="star-mark-red">★</span>' : ''}</td>
+                <td class="cell-no" data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
                 <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(bottle.bottleName, bottle.bottleNameKana)}</td>
                 <td data-label="お客様名"><button class="customer-link" data-customer-bottles="${customer.id}">${escapeHtml(customer.name)}</button></td>
                 <td class="flex-row" data-label="操作">
@@ -1198,8 +1211,11 @@ function renderManageBottleBody(root) {
             return `
             <tr>
               <td data-label=""><button class="btn btn-sm btn-visit" data-visit="${customer.id}">来店</button></td>
-              <td data-label="★">${customer.star ? '<span class="star-mark-red">★</span>' : ''}</td>
-              <td data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
+              <td class="flex-row" data-label="操作">
+                <button class="btn btn-sm btn-ghost" data-view="${bottle.id}">閲覧</button>
+              </td>
+              <td class="cell-star" data-label="★">${customer.star ? '<span class="star-mark-red">★</span>' : ''}</td>
+              <td class="cell-no" data-label="ボトルNo.">${bottleTagHtml(bottle)}</td>
               <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(bottle.bottleName, bottle.bottleNameKana)}</td>
               <td data-label="お客様名">
                 <button class="customer-link" data-customer-bottles="${customer.id}">${escapeHtml(customer.name)}</button> ${starHtml(customer)}<br>
@@ -1208,9 +1224,6 @@ function renderManageBottleBody(root) {
               <td class="date-cell-compact" data-label="最終来店日">${BKUtil.displayDateBroken(bottle.lastVisitDate)}</td>
               <td class="text-muted" data-label="特徴・注意事項">${escapeHtml(customer.memo)}</td>
               <td data-label="状態"><span class="status-pill ${status.cls}">${status.label}</span></td>
-              <td class="flex-row" data-label="操作">
-                <button class="btn btn-sm btn-ghost" data-view="${bottle.id}">閲覧</button>
-              </td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -1301,7 +1314,7 @@ function renderManageCustomerBody(root) {
   const body = root.querySelector('#mc-body');
   body.innerHTML = `
     <div class="table-wrap is-cardable ${APP.settings.simpleModeCustomer ? 'is-simple' : ''}">
-      <table class="data-table data-table--fixed">
+      <table class="data-table data-table--fixed data-table--fit">
         <colgroup>
           ${APP.settings.simpleModeCustomer ? `
           <col style="width:88px"><col style="width:26%"><col style="width:74%"><col style="width:86px">
@@ -1862,7 +1875,7 @@ function renderVisitDateSearchBody(root) {
       <button class="btn btn-sm ${state.sort === 'bottleNo' ? 'btn-primary' : 'btn-ghost'}" data-sortbtn="bottleNo">ボトル番号順</button>
     </div>
     <div class="table-wrap is-cardable">
-      <table class="data-table">
+      <table class="data-table data-table--fit">
         <thead><tr><th>ボトル・お客様</th><th>来店登録時刻</th><th>操作</th></tr></thead>
         <tbody>
         ${sorted.map(({ bottle, customer, visit }) => `
@@ -2293,13 +2306,13 @@ function renderDisposalHistoryScreen(root) {
 function disposalHistoryTableHtml(list) {
   return `
     <div class="table-wrap is-cardable">
-      <table class="data-table data-table--fixed">
+      <table class="data-table data-table--fixed data-table--wide">
         <colgroup>
-          <col style="width:16%"><col style="width:16%"><col style="width:22%"><col style="width:104px"><col style="width:104px"><col style="width:70px"><col style="width:26%"><col style="width:100px"><col style="width:110px">
+          <col style="width:120px"><col style="width:140px"><col style="width:140px"><col style="width:170px"><col style="width:104px"><col style="width:104px"><col style="width:70px"><col><col style="width:100px">
         </colgroup>
         <thead><tr>
-          <th>履歴ID</th><th>ボトル名</th><th>お客様名</th>
-          <th>最終来店日</th><th>破棄日</th><th>残量</th><th>特徴・注意事項</th><th>状態</th><th>操作</th>
+          <th>操作</th><th>履歴ID</th><th>ボトル名</th><th>お客様名</th>
+          <th>最終来店日</th><th>破棄日</th><th>残量</th><th>特徴・注意事項</th><th>状態</th>
         </tr></thead>
         <tbody>
         ${list.map((h) => {
@@ -2311,6 +2324,7 @@ function disposalHistoryTableHtml(list) {
               : `<span class="text-faint" title="No.${h.originalBottleNo} は現在使用中のため復元できません">復元不可（番号使用中）</span>`;
           return `
           <tr>
+            <td data-label="操作">${restoreBtn}</td>
             <td data-label="履歴ID">${escapeHtml(h.displayId)}</td>
             <td class="text-muted" data-label="ボトル名">${bottleNameCellHtml(h.bottleNameSnapshot, h.bottleNameKanaSnapshot)}</td>
             <td data-label="お客様名">
@@ -2322,7 +2336,6 @@ function disposalHistoryTableHtml(list) {
             <td data-label="残量">${h.remainingAmount}%</td>
             <td class="text-muted" data-label="特徴・注意事項">${escapeHtml(h.memo)}</td>
             <td data-label="状態">${h.status === 'restored' ? '<span class="status-pill status-normal">復元済み</span>' : '<span class="status-pill status-target">破棄済み</span>'}</td>
-            <td data-label="操作">${restoreBtn}</td>
           </tr>`;
         }).join('')}
         </tbody>
@@ -2576,13 +2589,17 @@ function attachResponsePageLinkEvents(root) {
 function renderStaffReviewScreen(root) {
   staffReviewPromotedBottleIds = new Set();
   root.innerHTML = `
-    <h2 class="screen-title">確認結果</h2>
-    <p class="text-muted">スタッフが確認ページで送信した内容です。「残す候補」はチェックを入れて一括で★にできます。「要確認」はコメントのみのため、修正画面で個別に判断してください。</p>
+    <h2 class="screen-title">破棄アンケート</h2>
+    <p class="text-muted">スタッフが回答ページで送信した内容です。「残す候補」はチェックを入れて一括で★にできます。「要確認」はコメント付きのため、内容を見て個別に判断してください。</p>
     ${responsePageLinkHtml()}
     <div id="sr-body"><div class="empty-state">読み込み中...</div></div>
+    <h3 class="section-title" style="margin-top:28px;">回答履歴</h3>
+    <p class="text-muted">スタッフが回答ページで送信した内容の全履歴です。</p>
+    <div id="rh-body"><div class="empty-state">読み込み中...</div></div>
   `;
   attachResponsePageLinkEvents(root);
   loadAndRenderStaffReview(root);
+  loadAndRenderResponseHistory(root);
 }
 
 async function loadAndRenderStaffReview(root) {
@@ -2695,17 +2712,6 @@ async function applyStarToCustomers(customerIds) {
   showToast(`${customerIds.length}件を★にしました`);
 }
 
-function renderResponseHistoryScreen(root) {
-  root.innerHTML = `
-    <h2 class="screen-title">回答履歴</h2>
-    <p class="text-muted">スタッフが確認ページで送信した内容の全履歴です。</p>
-    ${responsePageLinkHtml()}
-    <div id="rh-body"><div class="empty-state">読み込み中...</div></div>
-  `;
-  attachResponsePageLinkEvents(root);
-  loadAndRenderResponseHistory(root);
-}
-
 async function loadAndRenderResponseHistory(root) {
   const body = root.querySelector('#rh-body');
   let responses;
@@ -2786,16 +2792,16 @@ function historyPanelHtml() {
     <div class="table-wrap is-cardable">
       <table class="data-table">
         <thead><tr>
-          <th>日時</th><th>操作</th><th>対象</th><th>メモ</th><th>操作</th>
+          <th>操作</th><th>日時</th><th>種別</th><th>対象</th><th>メモ</th>
         </tr></thead>
         <tbody>
         ${logs.slice(0, 300).map((log) => `
           <tr>
+            <td data-label="操作"><button class="btn btn-sm btn-ghost" data-undo="${log.id}">元に戻す</button></td>
             <td data-label="日時">${new Date(log.timestamp).toLocaleString('ja-JP')}</td>
             <td data-label="種別"><span class="status-pill status-normal">${escapeHtml(log.actionType)}</span></td>
             <td data-label="対象">${targetLabelForLog(log)}</td>
             <td class="text-muted" data-label="メモ">${escapeHtml(log.note || '')}</td>
-            <td data-label="操作"><button class="btn btn-sm btn-ghost" data-undo="${log.id}">元に戻す</button></td>
           </tr>
         `).join('')}
         </tbody>
@@ -3333,18 +3339,7 @@ function renderBackupScreen(root) {
     await APP.storage.putSettings(APP.settings);
     showToast('端末情報を保存しました');
   });
-  root.querySelector('#btn-sync-now').addEventListener('click', async (e) => {
-    const btn = e.currentTarget;
-    const originalLabel = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '送信中…';
-    try {
-      await manualSyncNow();
-    } finally {
-      btn.disabled = false;
-      btn.textContent = originalLabel;
-    }
-  });
+  root.querySelector('#btn-sync-now').addEventListener('click', (e) => syncWithButtonFeedback(e.currentTarget));
   root.querySelector('#btn-pull-now').addEventListener('click', () => {
     const body = hasUnsyncedLocalChanges()
       ? `<div class="warning-box">⚠ この端末にはまだ送信していない変更が残っている可能性があります。先に取得すると、その変更は失われます。</div><p>共有データを取得して、この端末のデータを置き換えます。よろしいですか？</p>`

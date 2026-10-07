@@ -127,58 +127,42 @@ html, body {
 }
 .backup-status--warn { color: var(--color-warning-strong); font-weight: 700; }
 
-/* ---------- レイアウト（サイドメニュー + コンテンツ） ---------- */
+/* ---------- レイアウト（上部メニュー + コンテンツ） ---------- */
 .app-body {
   flex: 1;
   display: flex;
   min-height: 0;
 }
 
-.sidenav {
-  width: 210px;
-  flex-shrink: 0;
+/* 上部メニュー：スクロールしなくても全項目が見えるよう、幅が足りなければ折り返す */
+.topnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 20px;
   background: var(--color-surface);
-  border-right: 1px solid var(--color-border-soft);
-  padding: 16px 10px;
-  overflow-y: auto;
+  border-bottom: 1px solid var(--color-border-soft);
+  flex-shrink: 0;
 }
-
-.sidenav__group-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 18px 0 4px;
-  padding: 8px 12px 4px;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-
-.sidenav__item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 14px 12px;
-  margin-bottom: 4px;
+.topnav__item {
+  padding: 10px 14px;
   background: transparent;
   border: none;
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 600;
   font-family: var(--font-body);
-  text-align: left;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.sidenav__item--sub { padding-left: 24px; font-size: 15px; }
-.sidenav__item:active { background: var(--color-accent-soft); }
-.sidenav__item.is-active {
+.topnav__item:active { background: var(--color-accent-soft); }
+.topnav__item.is-active {
   background: var(--color-accent-strong);
   color: #FFFFFF;
   font-weight: 700;
 }
-.sidenav__icon { width: 18px; text-align: center; }
 
 .screen-root {
   flex: 1;
@@ -198,6 +182,13 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--color-accent-strong);
 }
 .screen-title .count-badge {
   font-family: var(--font-body);
@@ -411,6 +402,34 @@ table.data-table {
 /* 内容の長さに関わらず列幅を固定し、選んだ種類によって列の位置がずれるのを防ぐ */
 table.data-table--fixed {
   table-layout: fixed;
+}
+/* ボトルNo.の列：余白を詰め、札を一回り小さくして、細い列でも札が途切れないようにする */
+table.data-table th.cell-no,
+table.data-table td.cell-no {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+table.data-table td.cell-no .bottle-tag {
+  font-size: 13px;
+  padding: 3px 8px;
+}
+table.data-table td.cell-no .bottle-tag::before {
+  display: none;
+}
+/* ★専用の列：左右の余白を同じにして、★が列の中央に来るようにする */
+table.data-table th.cell-star,
+table.data-table td.cell-star {
+  padding-left: 0;
+  padding-right: 0;
+  text-align: center;
+}
+/* 列が少なく、タブレット縦画面の幅にそのまま収まる一覧：最小幅の指定を外して横スクロールをなくす */
+table.data-table--fit {
+  min-width: 0;
+}
+/* 列が多い一覧：列をpx固定にしたうえで、名前などが細くつぶれない最小幅を確保する（足りない分は横スクロール） */
+table.data-table--wide {
+  min-width: 1060px;
 }
 /* 所有ボトルのモーダル用：狭い幅でも横スクロールさせず、最終来店日が見切れないようにする */
 table.data-table--modal {
@@ -753,37 +772,20 @@ table.data-table--fixed th {
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 6px; }
 
-/* PC・タブレット横画面：既定のレイアウト（サイドメニューはフル表示） */
-
-/* タブレット横〜PC小さめ幅：サイドメニューをアイコン中心に */
-@media (max-width: 1180px) {
-  .sidenav { width: 200px; }
-}
-
 /* タブレット縦画面・スマホ横画面幅を想定した最小幅 */
 @media (max-width: 900px) {
-  .sidenav { width: 76px; }
-  .sidenav__item span:not(.sidenav__icon) { display: none; }
-  .sidenav__group-label { justify-content: center; }
-  .sidenav__group-label span:not(.sidenav__icon) { display: none; }
   .form-grid { grid-template-columns: 1fr; }
   .bottle-row__grid { grid-template-columns: 1fr 1fr; }
-
-  /* サブメニューの文字は横に折り返すと項目ごとに位置がずれて見えるため、縦書きで統一する */
-  .sidenav__item--sub {
-    writing-mode: vertical-rl;
-    text-orientation: upright;
-    min-height: 120px;
-    padding: 10px 2px;
-    letter-spacing: 2px;
-  }
+  .topnav { padding: 8px 14px; }
+  .topnav__item { padding: 10px 9px; font-size: 14px; }
 }
 
 /* スマホ横画面向け：幅はあっても高さが低いため、縦方向の余白を詰めて表示領域を確保する */
 @media (max-height: 480px) and (orientation: landscape) {
   .app-header { padding: 8px 16px; }
   .app-header__title h1 { font-size: 16px; }
-  .sidenav__item, .sidenav__group-label { padding: 8px 10px; }
+  .topnav { padding: 4px 16px; }
+  .topnav__item { padding: 6px 10px; }
   .screen-root { padding: 10px 16px 20px; }
   .screen-title { font-size: 18px; margin-bottom: 10px; }
   .panel { padding: 12px; margin-bottom: 12px; }
@@ -791,11 +793,10 @@ table.data-table--fixed th {
   .modal-box { max-height: 88vh; overflow-y: auto; }
 }
 
-/* スマホ縦画面向け：サイドメニューをさらに縮小し、余白を詰めて画面を有効活用する */
+/* スマホ縦画面向け：余白を詰めて画面を有効活用する */
 @media (max-width: 600px) {
-  .sidenav { width: 58px; padding: 12px 6px; }
-  .sidenav__item { padding: 12px 4px; justify-content: center; text-align: center; }
-  .sidenav__item--sub { padding-left: 4px; }
+  .topnav { padding: 6px 10px; gap: 2px; }
+  .topnav__item { padding: 8px 10px; font-size: 13px; }
   .app-header { padding: 12px 14px; }
   .app-header__title h1 { font-size: 17px; }
   .backup-status { font-size: 11px; }
