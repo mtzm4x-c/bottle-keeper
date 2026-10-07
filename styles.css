@@ -74,6 +74,8 @@ html, body {
 /* ---------- ヘッダー ---------- */
 .app-header {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   align-items: center;
   justify-content: space-between;
   padding: 14px 24px;
@@ -104,7 +106,9 @@ html, body {
   justify-content: flex-end;
 }
 
+.app-header__title { flex-shrink: 0; }
 .app-header__title h1 {
+  white-space: nowrap;
   font-family: var(--font-display);
   font-size: 21px;
   font-weight: 700;
@@ -807,6 +811,12 @@ table.data-table--fixed th {
   .bottle-row__grid { grid-template-columns: 1fr 1fr; }
   .topnav { padding: 8px 14px; }
   .topnav__item { padding: 10px 9px; font-size: 14px; }
+}
+
+/* 小さめのタブレット縦画面（幅700px前後）：メニュー9項目が1行に収まるよう、文字と余白をさらに詰める */
+@media (max-width: 780px) {
+  .topnav { gap: 2px; padding: 8px 10px; }
+  .topnav__item { padding: 10px 6px; font-size: 13px; }
 }
 
 /* スマホ横画面向け：幅はあっても高さが低いため、縦方向の余白を詰めて表示領域を確保する */
